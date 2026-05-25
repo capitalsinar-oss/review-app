@@ -3,16 +3,42 @@
 
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
+
+// --- lightweight config storage (JSON file) ---
+// Each property gets a short ID; the QR only needs to hold that ID,
+// keeping the code sparse and easy to scan. Editing config later keeps
+// the same QR. On Render's free tier the filesystem resets on redeploy,
+// so this persists between visits but not across redeploys — fine for
+// launch; swap to a real DB later for permanence.
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
+const STORE_FILE = path.join(DATA_DIR, "configs.json");
+function loadStore() {
+  try { return JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); }
+  catch (e) { return {}; }
+}
+function saveStore(obj) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(STORE_FILE, JSON.stringify(obj, null, 2));
+    return true;
+  } catch (e) { console.error("save failed:", e.message); return false; }
+}
+function shortId() {
+  return crypto.randomBytes(4).toString("hex").slice(0, 6); // e.g. "a7f3c1"
+}
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const RESEND_KEY    = process.env.RESEND_API_KEY;
 const GOOGLE_KEY    = process.env.GOOGLE_MAPS_API_KEY; // for live Google reviews
 const FROM_EMAIL    = process.env.FROM_EMAIL || "feedback@yourdomain.com";
 const MODEL         = "claude-sonnet-4-6"; // current model (Sonnet 4.6)
+
 
 // --- helper: fetch & strip a public web page to plain text ---
 // Works for normal sites (e.g. your Wix site). Sites that block bots
@@ -194,18 +220,46 @@ app.post("/api/resolve-maps", async (req, res) => {
 
     // 2) resolve to a live Place ID + identity via Text Search (this works on your key)
     if (!GOOGLE_KEY) return res.json({ ok: false, reason: "No Google key configured." });
+
+    // Build request body. If we have coordinates from the Maps link, bias the
+    // search tightly around them so we get THIS villa, not a same-named place
+    // in another country.
+    const searchBody = { textQuery: linkInfo.name };
+    if (linkInfo.lat && linkInfo.lng) {
+      searchBody.locationBias = {
+        circle: {
+          center: { latitude: parseFloat(linkInfo.lat), longitude: parseFloat(linkInfo.lng) },
+          radius: 500.0, // metres — tight, since we know the exact spot
+        },
+      };
+    }
+
     const r = await fetch("https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "X-Goog-Api-Key": GOOGLE_KEY,
-        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.websiteUri,places.primaryTypeDisplayName",
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.websiteUri,places.primaryTypeDisplayName",
       },
-      body: JSON.stringify({ textQuery: [linkInfo.name, linkInfo.lat && linkInfo.lng ? `${linkInfo.lat},${linkInfo.lng}` : ""].filter(Boolean).join(" ") }),
+      body: JSON.stringify(searchBody),
     });
     if (!r.ok) { const t = await r.text(); return res.json({ ok: false, reason: "Google lookup failed: " + t }); }
     const d = await r.json();
-    const p = d.places && d.places[0];
+
+    // Pick the result closest to the link's coordinates, not just the first.
+    let p = d.places && d.places[0];
+    if (linkInfo.lat && linkInfo.lng && d.places && d.places.length > 1) {
+      const tLat = parseFloat(linkInfo.lat), tLng = parseFloat(linkInfo.lng);
+      let best = null, bestDist = Infinity;
+      for (const cand of d.places) {
+        if (cand.location) {
+          const dLat = cand.location.latitude - tLat, dLng = cand.location.longitude - tLng;
+          const dist = dLat * dLat + dLng * dLng;
+          if (dist < bestDist) { bestDist = dist; best = cand; }
+        }
+      }
+      if (best) p = best;
+    }
     if (!p) return res.json({ ok: false, reason: "Place not found on Google." });
 
     res.json({
@@ -222,6 +276,32 @@ app.post("/api/resolve-maps", async (req, res) => {
     console.error(e);
     res.status(500).json({ error: e.message });
   }
+});
+
+// === SAVE a property config → returns a short id for the QR ===
+app.post("/api/save-config", (req, res) => {
+  try {
+    const cfg = req.body && req.body.config;
+    if (!cfg || !cfg.name) return res.status(400).json({ error: "missing config" });
+    const store = loadStore();
+    // reuse id if the client already had one (editing), else mint new
+    let id = (req.body.id && store[req.body.id]) ? req.body.id : shortId();
+    while (!req.body.id && store[id]) id = shortId(); // avoid rare collision
+    store[id] = cfg;
+    if (!saveStore(store)) return res.status(500).json({ error: "could not save" });
+    res.json({ id });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// === GET a property config by short id (guest scan) ===
+app.get("/api/config/:id", (req, res) => {
+  const store = loadStore();
+  const cfg = store[req.params.id];
+  if (!cfg) return res.status(404).json({ error: "not found" });
+  res.json({ config: cfg });
 });
 
 // === 1. EXTRACTION: combine website + Google reviews + pasted text into chips ===
