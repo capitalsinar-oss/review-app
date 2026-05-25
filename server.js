@@ -307,7 +307,9 @@ app.get("/api/config/:id", (req, res) => {
 // === 1. EXTRACTION: combine website + Google reviews + pasted text into chips ===
 app.post("/api/extract", async (req, res) => {
   try {
-    const { name, type, loc, source, websiteUrl, placeId } = req.body;
+    const { name, type, loc, source: rawSource, websiteUrl, placeId } = req.body;
+    // Cap the pasted reviews so a huge paste can't dominate by sheer volume.
+    const source = rawSource ? String(rawSource).slice(0, 6000) : "";
 
     // Gather all three sources in parallel
     const [siteText, googleResult] = await Promise.all([
@@ -316,10 +318,19 @@ app.post("/api/extract", async (req, res) => {
     ]);
     const googleText = googleResult.text;
 
+    // Label each source and note which are present, so we can instruct balance.
+    const present = [];
+    if (siteText) present.push("the website");
+    if (googleText) present.push("Google reviews");
+    if (source) present.push("Airbnb/Booking reviews");
+    const balanceNote = present.length > 1
+      ? `\nIMPORTANT — BALANCE THE SOURCES: You have ${present.length} sources (${present.join(", ")}). Draw chips fairly from ALL of them, not just whichever is longest. The website describes the property's features and character; the reviews capture what guests actually felt and praised. A good set blends both: concrete features/amenities (often from the website) AND experiential, emotional, or service themes (often from reviews). Aim for a roughly even spread across sources — do not let the source with the most text dominate.\n`
+      : "";
+
     const combined = [
-      siteText   ? "=== WEBSITE CONTENT ===\n" + siteText : "",
-      googleText ? "=== LIVE GOOGLE REVIEWS ===\n" + googleText : "",
-      source     ? "=== PASTED REVIEWS (Airbnb/Booking/other) ===\n" + source : "",
+      siteText   ? "=== WEBSITE CONTENT (property features & character) ===\n" + siteText : "",
+      googleText ? "=== LIVE GOOGLE REVIEWS (guest experiences) ===\n" + googleText : "",
+      source     ? "=== PASTED AIRBNB/BOOKING REVIEWS (guest experiences) ===\n" + source : "",
     ].filter(Boolean).join("\n\n");
 
     const prompt =
@@ -328,7 +339,7 @@ Below is source material drawn from the business's own website, its live Google 
 
 SOURCE:
 ${combined || "(none available — use sensible defaults for this type of business)"}
-
+${balanceNote}
 Identify the SPECIFIC things guests love and mention repeatedly — real features, named staff, signature dishes, specific experiences, the genuine character of this place. Turn them into short tappable chips (2-4 words each) a future guest could tap to describe their own visit.
 
 Group into 3-4 themed categories. Prefer specific over generic ("Rock-climbing wall" beats "good facilities"; "Gus Bayu's hospitality" beats "friendly staff") — but only use specifics that actually appear in the source.
