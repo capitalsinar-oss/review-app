@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Review Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--forest:#2f3b32;--forest-deep:#222b24;--sand:#e9e1d4;--sand-light:#f4efe6;
+    --dune:#c9a987;--dune-deep:#b08f6a;--ink:#33352f;--muted:#7d7a6f;
+    --line:#ddd3c2;--white:#fdfbf6;--rose:#b5654a;--rose-soft:#f7e8e3;}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{font-family:'Outfit',sans-serif;background:var(--sand-light);color:var(--ink);line-height:1.55;}
+  .wrap{max-width:520px;margin:0 auto;min-height:100vh;
+    background:radial-gradient(120% 80% at 50% -10%, #fff7ec 0%, var(--sand-light) 55%);
+    position:relative;padding:0 22px 56px;}
+  .wrap::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.04;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+  .screen{position:relative;z-index:1;display:none;animation:rise .5s cubic-bezier(.2,.8,.2,1) both;}
+  .screen.active{display:block;}
+  @keyframes rise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+  @keyframes fadein{from{opacity:0;}to{opacity:1;}}
+  .modebar{display:flex;gap:8px;justify-content:center;padding:22px 0 4px;position:relative;z-index:2;}
+  .modebar button{font-family:'Outfit';font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+    border:1px solid var(--line);background:var(--white);color:var(--muted);padding:7px 15px;
+    border-radius:30px;cursor:pointer;font-weight:600;transition:all .2s;}
+  .modebar button.on{background:var(--forest);color:var(--sand-light);border-color:var(--forest);}
+  header{padding:26px 0 14px;text-align:center;}
+  .crest{font-family:'Fraunces',serif;font-size:12px;letter-spacing:.34em;text-transform:uppercase;
+    color:var(--dune-deep);font-weight:500;}
+  .biz-name{font-family:'Fraunces',serif;font-size:31px;line-height:1.08;font-weight:500;
+    color:var(--forest);margin-top:9px;letter-spacing:-.01em;}
+  .biz-loc{font-size:13px;color:var(--muted);margin-top:6px;letter-spacing:.04em;}
+  .rule{width:38px;height:1px;background:var(--dune);margin:18px auto 0;opacity:.6;}
+  .step-tag{text-align:center;font-size:12px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--dune-deep);font-weight:600;margin-bottom:6px;}
+  .lead{font-family:'Fraunces',serif;font-size:21px;color:var(--forest);font-weight:400;
+    text-align:center;margin:24px 0 6px;line-height:1.3;}
+  .sub{text-align:center;color:var(--muted);font-size:14px;margin-bottom:22px;}
+  .card{background:var(--white);border:1px solid var(--line);border-radius:18px;padding:22px;margin-top:16px;
+    box-shadow:0 16px 40px -30px rgba(47,59,50,.4);}
+  label.fld{display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+    font-weight:600;margin:16px 0 7px;}
+  label.fld:first-child{margin-top:0;}
+  input,select,textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+    font-family:'Outfit';font-size:14.5px;color:var(--ink);background:var(--sand-light);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--dune);}
+  textarea{resize:vertical;min-height:130px;line-height:1.55;}
+  .hint{font-size:12px;color:var(--muted);margin-top:7px;line-height:1.5;}
+  .btn{width:100%;border:none;border-radius:14px;padding:16px;font-family:'Outfit';font-size:15.5px;
+    font-weight:600;letter-spacing:.02em;cursor:pointer;margin-top:22px;
+    transition:transform .15s,box-shadow .25s,opacity .2s;}
+  .btn:active{transform:scale(.97);}
+  .btn-primary{background:var(--forest);color:var(--sand-light);box-shadow:0 12px 28px -12px rgba(47,59,50,.7);}
+  .btn-primary:disabled{opacity:.4;box-shadow:none;cursor:default;}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:500;margin-top:10px;}
+  .btn-gold{background:linear-gradient(135deg,var(--dune),var(--dune-deep));color:#fff;
+    box-shadow:0 12px 28px -12px rgba(176,143,106,.8);}
+  .ex-group{margin:20px 0;animation:fadein .4s both;}
+  .ex-group h4{font-family:'Outfit';font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--muted);font-weight:600;margin-bottom:11px;display:flex;align-items:center;gap:9px;}
+  .ex-group h4::after{content:"";flex:1;height:1px;background:var(--line);}
+  .chips{display:flex;flex-wrap:wrap;gap:9px;}
+  .chip{border:1px solid var(--line);background:var(--white);color:var(--ink);padding:9px 14px;
+    border-radius:30px;font-size:14px;font-family:'Outfit';cursor:pointer;transition:all .18s;
+    display:inline-flex;align-items:center;gap:7px;}
+  .chip .x{opacity:.4;font-size:15px;}
+  .chip.sel{background:var(--forest);color:var(--sand-light);border-color:var(--forest);
+    box-shadow:0 6px 16px -8px rgba(47,59,50,.6);}
+  .chip:active{transform:scale(.94);}
+  .chip-add{border:1px dashed var(--dune);color:var(--dune-deep);background:transparent;}
+  .loading{text-align:center;padding:48px 0;}
+  .pen{font-size:44px;animation:sway 1.6s ease-in-out infinite;display:inline-block;}
+  @keyframes sway{0%,100%{transform:rotate(-8deg) translateY(0);}50%{transform:rotate(8deg) translateY(-6px);}}
+  .loading p{font-family:'Fraunces',serif;font-size:18px;color:var(--forest);margin-top:18px;}
+  .loading span{color:var(--muted);font-size:13px;display:block;margin-top:6px;}
+  .qr-out{margin-top:16px;text-align:center;}
+  .qr-out img{width:180px;height:180px;background:#fff;padding:12px;border-radius:14px;border:1px solid var(--line);}
+  .linkbox{display:block;margin-top:14px;word-break:break-all;font-size:12px;color:var(--dune-deep);
+    background:var(--sand-light);padding:12px;border-radius:10px;border:1px dashed var(--line);}
+  .stars{display:flex;justify-content:center;gap:8px;margin:22px 0 6px;}
+  .star{font-size:40px;color:var(--line);cursor:pointer;transition:transform .15s,color .2s;line-height:1;}
+  .star.on{color:var(--dune);transform:scale(1.05);}
+  .star:active{transform:scale(.86);}
+  .rating-word{text-align:center;height:20px;font-size:13px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--dune-deep);font-weight:500;}
+  .group{margin:22px 0;animation:fadein .5s both;}
+  .group h3{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:600;
+    margin-bottom:12px;display:flex;align-items:center;gap:9px;}
+  .group h3::after{content:"";flex:1;height:1px;background:var(--line);}
+  .note-label{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:600;
+    margin:24px 0 11px;display:flex;align-items:center;gap:9px;}
+  .note-label::after{content:"";flex:1;height:1px;background:var(--line);}
+  .note-row{display:flex;gap:10px;}
+  .note-row textarea{min-height:60px;}
+  .mic{width:54px;border:1px solid var(--line);background:var(--white);border-radius:14px;display:flex;
+    align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:22px;transition:all .2s;}
+  .mic.rec{background:var(--dune);border-color:var(--dune);animation:pulse 1.2s infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(201,169,135,.5);}50%{box-shadow:0 0 0 12px rgba(201,169,135,0);}}
+  .tone-row{display:flex;flex-wrap:wrap;gap:8px;}
+  .tone{border:1px solid var(--line);background:var(--white);padding:9px 14px;border-radius:30px;
+    font-size:13.5px;cursor:pointer;transition:all .18s;}
+  .tone.sel{background:var(--dune);color:#fff;border-color:var(--dune);}
+  .seg{display:flex;border:1px solid var(--line);border-radius:30px;overflow:hidden;margin:6px 0;}
+  .seg button{flex:1;border:none;background:var(--white);padding:13px 8px;font-family:'Outfit';font-size:13.5px;
+    cursor:pointer;color:var(--muted);font-weight:500;transition:all .2s;}
+  .seg button.on{background:var(--forest);color:var(--sand-light);font-weight:600;}
+  .review-card{background:var(--white);border:1px solid var(--line);border-radius:20px;padding:26px 24px;
+    margin-top:8px;position:relative;box-shadow:0 20px 48px -28px rgba(47,59,50,.4);}
+  .review-card .quote{font-family:'Fraunces',serif;font-size:58px;color:var(--dune);opacity:.32;
+    position:absolute;top:4px;left:18px;line-height:1;}
+  .review-text{font-size:15.5px;line-height:1.72;white-space:pre-wrap;padding-top:14px;outline:none;border-radius:8px;}
+  .review-text:focus{background:var(--sand);}
+  .review-stars{margin-top:16px;color:var(--dune);font-size:18px;letter-spacing:3px;}
+  .edit-hint{text-align:center;font-size:12px;color:var(--muted);margin-top:13px;font-style:italic;}
+  .fstep{display:flex;gap:13px;align-items:flex-start;padding:13px 0;border-bottom:1px solid var(--line);}
+  .fstep:last-child{border-bottom:none;}
+  .fnum{width:25px;height:25px;border-radius:50%;background:var(--sand);color:var(--forest);display:flex;
+    align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0;font-family:'Fraunces';}
+  .fstep p{font-size:14px;}.fstep p b{color:var(--forest);}
+  .private-card{background:var(--rose-soft);border:1px solid #e0c3b6;border-radius:18px;padding:22px;margin-top:8px;}
+  .private-card h3{font-family:'Fraunces';font-size:20px;color:var(--rose);font-weight:500;margin-bottom:6px;}
+  .private-card p{font-size:14px;color:#7a4a3a;margin-bottom:8px;}
+  .footer-note{text-align:center;font-size:11.5px;color:var(--muted);margin-top:26px;line-height:1.6;}
+  .err{background:var(--rose-soft);border:1px solid #e0c3b6;color:#8a4b35;padding:13px 16px;border-radius:12px;
+    font-size:13.5px;margin-top:16px;text-align:center;}
+  .flash{position:fixed;left:50%;bottom:40px;transform:translateX(-50%) translateY(20px);background:var(--forest-deep);
+    color:var(--sand-light);padding:13px 24px;border-radius:30px;font-size:14px;opacity:0;transition:all .35s;
+    z-index:50;pointer-events:none;box-shadow:0 12px 30px -10px rgba(0,0,0,.5);}
+  .flash.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="modebar">
+    <button id="mOwner" class="on">Owner setup</button>
+    <button id="mGuest">Guest preview</button>
+  </div>
+
+  <!-- OWNER INPUT -->
+  <section class="screen active" id="o-input">
+    <header><div class="crest">Review Studio</div>
+      <div class="biz-name" style="font-size:27px">Set up a property</div><div class="rule"></div></header>
+    <div class="sub">Paste your Google Maps link. We'll pull your name, address &amp; reviews —<br>then you can add a website and Airbnb reviews if you like.</div>
+    <div class="card">
+      <label class="fld">Google Maps link <span style="text-transform:none;letter-spacing:0;font-weight:400">(required)</span></label>
+      <div class="note-row">
+        <input id="iMaps" placeholder="Paste your Maps share link or business URL">
+        <button id="resolveMaps" class="mic" style="width:auto;padding:0 16px;font-size:13px;font-weight:600;white-space:nowrap">Auto-fill</button>
+      </div>
+      <div id="mapsResult" style="display:none;margin-top:14px;padding:14px;border-radius:12px;background:#e3ede0;border:1px solid #c4d6bd;font-size:13.5px;color:#2f3b32"></div>
+      <div id="mapsErr" style="display:none;margin-top:12px" class="err"></div>
+
+      <label class="fld">Business name</label>
+      <input id="iName" placeholder="auto-filled from Google — editable">
+      <label class="fld">Location line</label>
+      <input id="iLoc" placeholder="auto-filled from Google — editable">
+      <label class="fld">Type</label>
+      <select id="iType">
+        <option value="villa">Villa / Stay</option>
+        <option value="restaurant">Restaurant / Café</option>
+        <option value="generic">Other</option>
+      </select>
+      <label class="fld">Google review link <span style="text-transform:none;letter-spacing:0;font-weight:400">(where guests post)</span></label>
+      <input id="iGoogle" placeholder="https://search.google.com/local/writereview?placeid=…">
+      <input id="iPlaceId" type="hidden">
+      <label class="fld">Owner email (for private feedback)</label>
+      <input id="iEmail" type="email" placeholder="you@property.com">
+    </div>
+    <div class="card">
+      <label class="fld">Website URL <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional — auto-read)</span></label>
+      <input id="iWebsite" placeholder="endlesssummerbali.com" style="margin-bottom:16px">
+      <label class="fld">Paste Airbnb / Booking reviews <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional — these block auto-reading)</span></label>
+      <textarea id="iSource" placeholder="Airbnb and Booking block automated reading, so paste a few of their reviews here if you'd like them included. Your Google reviews and website are read automatically."></textarea>
+      <div class="hint">Everything here is optional — Google + website already give great results.</div>
+    </div>
+    <button class="btn btn-primary" id="extract" disabled>Read it & build my chips ✦</button>
+  </section>
+
+  <section class="screen" id="o-loading"><div class="loading"><div class="pen">📖</div>
+    <p>Reading your reviews…</p><span>Finding the themes guests keep coming back to</span></div></section>
+
+  <section class="screen" id="o-edit">
+    <header style="padding-bottom:4px"><div class="step-tag">Review &amp; refine</div>
+      <div class="biz-name" style="font-size:24px">Your guest prompts</div></header>
+    <div class="sub">These came from your reviews. Tap to drop, or add your own.</div>
+    <div id="exGroups"></div>
+    <button class="btn btn-primary" id="toQR">Generate guest link &amp; QR ✦</button>
+    <button class="btn btn-ghost" id="backInput">← Start over</button>
+  </section>
+
+  <section class="screen" id="o-qr">
+    <header style="padding-bottom:4px"><div class="step-tag">Ready to share</div>
+      <div class="biz-name" style="font-size:24px" id="qrName">Your QR is live</div></header>
+    <div class="sub">Print it for the villa, the table, the checkout counter.</div>
+    <div class="card qr-out"><img id="qrImg" alt="QR code"><a class="linkbox" id="qrLink" target="_blank"></a></div>
+    <button class="btn btn-gold" id="previewAsGuest">Preview the guest experience →</button>
+    <button class="btn btn-ghost" id="backEdit">← Edit chips</button>
+  </section>
+
+  <!-- GUEST -->
+  <section class="screen" id="g-start">
+    <header><div class="crest" id="gCrest">Guest Reflections</div>
+      <div class="biz-name" id="gName">Oasis Villas</div><div class="biz-loc" id="gLoc">Uluwatu, Bali</div>
+      <div class="rule"></div></header>
+    <div class="lead">How was your experience?</div><div class="sub">Tap to rate — takes about 30 seconds.</div>
+    <div class="stars" id="gStars"><span class="star" data-v="1">★</span><span class="star" data-v="2">★</span>
+      <span class="star" data-v="3">★</span><span class="star" data-v="4">★</span><span class="star" data-v="5">★</span></div>
+    <div class="rating-word" id="gRatingWord"></div>
+    <button class="btn btn-primary" id="gContinue" disabled>Continue</button>
+  </section>
+
+  <section class="screen" id="g-details">
+    <header style="padding-bottom:4px"><div class="step-tag">A few quick taps</div>
+      <div class="biz-name" style="font-size:24px">Tell us the highlights</div></header>
+    <div class="sub">Pick anything that fits. Skip what doesn't.</div>
+    <div id="gChips"></div>
+    <div class="note-label">Anything to add? <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></div>
+    <div class="note-row"><textarea id="gNote" placeholder="One detail in your own words — a moment, a name, a feeling…"></textarea>
+      <div class="mic" id="gMic">🎙️</div></div>
+    <div class="note-label">How do you sound?</div>
+    <div class="tone-row" id="gTone">
+      <div class="tone" data-t="warm and genuine">Warm</div><div class="tone" data-t="relaxed and casual">Chill</div>
+      <div class="tone" data-t="detailed and thoughtful">Detailed</div><div class="tone" data-t="playful and fun">Playful</div>
+      <div class="tone" data-t="short and to the point">No-nonsense</div></div>
+    <div class="note-label">Write in</div>
+    <select id="gLang">
+      <option>English</option><option>Bahasa Indonesia</option><option>Deutsch</option><option>Français</option>
+      <option>Español</option><option>Nederlands</option><option>Italiano</option><option>中文</option>
+      <option>日本語</option><option>Português</option></select>
+    <button class="btn btn-primary" id="gGenerate" style="margin-top:24px">Write my review ✦</button>
+    <button class="btn btn-ghost" id="gBack">← Back</button>
+  </section>
+
+  <section class="screen" id="g-improve">
+    <header style="padding-bottom:4px"><div class="step-tag">We want to do better</div>
+      <div class="biz-name" style="font-size:23px">What would have made it better?</div></header>
+    <div class="sub">Thank you for being honest — this goes straight to the owner.</div>
+    <div class="note-row"><textarea id="gImprove" style="min-height:120px" placeholder="Tell us what fell short…"></textarea></div>
+    <button class="btn btn-primary" id="sendPrivate">Send privately to the owner</button>
+    <div style="text-align:center;margin-top:18px;font-size:13px;color:var(--muted)">Would you still like to post a public review?</div>
+    <button class="btn btn-ghost" id="improveToPublic">Write a public review anyway →</button>
+  </section>
+
+  <section class="screen" id="g-loading"><div class="loading"><div class="pen">✍️</div>
+    <p>Composing your review…</p><span>In your voice, in your language</span></div></section>
+
+  <section class="screen" id="g-result">
+    <header style="padding-bottom:4px"><div class="step-tag">Ready to post</div></header>
+    <div class="review-card"><div class="quote">"</div>
+      <div class="review-text" id="gReviewText" contenteditable="true"></div>
+      <div class="review-stars" id="gReviewStars"></div></div>
+    <div class="edit-hint">Tap the text to tweak anything before posting.</div>
+    <div style="margin-top:18px"><div class="note-label">Post it</div>
+      <div class="seg" id="postSeg"><button data-p="public" class="on">Publicly to Google</button>
+        <button data-p="private">Privately to owner</button></div></div>
+    <button class="btn btn-gold" id="gCopyPost">Copy &amp; open Google ✦</button>
+    <button class="btn btn-ghost" id="gRegen">↻ Write a different version</button>
+    <div style="margin-top:22px" id="publicSteps">
+      <div class="fstep"><div class="fnum">1</div><p>We've <b>copied</b> your review.</p></div>
+      <div class="fstep"><div class="fnum">2</div><p>Google opens — <b>tap the box</b> &amp; <b>paste</b>.</p></div>
+      <div class="fstep"><div class="fnum">3</div><p>Hit <b>Post</b>. Thank you! ♡</p></div></div>
+    <div class="footer-note">You're posting under your own Google account, in your own words.</div>
+  </section>
+
+  <section class="screen" id="g-sent">
+    <div class="private-card" style="margin-top:60px"><h3>Thank you ♡</h3>
+      <p id="sentMsg">Your feedback has been sent privately to the owner.</p></div>
+  </section>
+</div>
+<div class="flash" id="flash">Copied ✓</div>
+
+<script>
+const RATING_WORDS={1:"Disappointing",2:"Could be better",3:"Good",4:"Really good",5:"Exceptional"};
+const FALLBACK={villa:[{h:"The space",c:["Stunning design","Private pool","Incredible views","Spotless","Felt like home"]},
+  {h:"The hosts",c:["Warm welcome","Attentive","Went above & beyond","Local tips"]},
+  {h:"The feeling",c:["Total relaxation","Sanctuary","Unforgettable","Would return"]}],
+  restaurant:[{h:"The food",c:["Delicious","Beautifully plated","Fresh","Best I've had"]},
+  {h:"The service",c:["Friendly","Attentive","Great recommendations"]},
+  {h:"The vibe",c:["Beautiful setting","Romantic","Lovely views"]}],
+  generic:[{h:"What stood out",c:["Excellent","Great service","Friendly team","Great value"]}]};
+let CFG={name:"Oasis Villas",loc:"Uluwatu, Bali",crest:"Guest Reflections",type:"villa",
+  google:"https://search.google.com/local/writereview?placeid=DEMO",email:"",chips:FALLBACK.villa};
+let state={rating:0,chips:new Set(),note:"",tone:"warm and genuine",lang:"English",review:""};
+
+(function(){const p=new URLSearchParams(location.search);
+  // New: short id ?v=abc123 → fetch config from server
+  if(p.get("v")){
+    fetch("/api/config/"+encodeURIComponent(p.get("v")))
+      .then(r=>r.ok?r.json():Promise.reject())
+      .then(d=>{CFG=d.config;switchMode("guest");})
+      .catch(()=>{/* fall back to owner view */});
+    return;
+  }
+  // Legacy: full blob ?b=… (still supported)
+  if(p.get("b")){try{CFG=JSON.parse(decodeURIComponent(escape(atob(p.get("b")))));switchMode("guest");}catch(e){}}
+})();
+
+function show(id){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");window.scrollTo({top:0});}
+function switchMode(m){document.getElementById("mOwner").classList.toggle("on",m==="owner");
+  document.getElementById("mGuest").classList.toggle("on",m==="guest");
+  if(m==="owner")show("o-input");else{applyGuestConfig();show("g-start");}}
+document.getElementById("mOwner").onclick=()=>switchMode("owner");
+document.getElementById("mGuest").onclick=()=>switchMode("guest");
+
+const iName=document.getElementById("iName");
+iName.addEventListener("input",()=>document.getElementById("extract").disabled=!iName.value.trim());
+
+// Auto-fill from Google Maps link
+document.getElementById("resolveMaps").onclick=async()=>{
+  const url=document.getElementById("iMaps").value.trim();
+  const resBox=document.getElementById("mapsResult");
+  const errBox=document.getElementById("mapsErr");
+  resBox.style.display="none";errBox.style.display="none";
+  if(!url){errBox.textContent="Paste your Google Maps link first.";errBox.style.display="block";return;}
+  const btn=document.getElementById("resolveMaps");const orig=btn.textContent;btn.textContent="…";
+  try{
+    const r=await fetch("/api/resolve-maps",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({mapsUrl:url})});
+    const d=await r.json();
+    if(!d.ok){errBox.textContent=d.reason||"Couldn't read that link.";errBox.style.display="block";btn.textContent=orig;return;}
+    // fill the fields
+    if(d.name)document.getElementById("iName").value=d.name;
+    if(d.address)document.getElementById("iLoc").value=d.address;
+    if(d.website)document.getElementById("iWebsite").value=d.website;
+    if(d.placeId){
+      document.getElementById("iPlaceId").value=d.placeId;
+      document.getElementById("iGoogle").value="https://search.google.com/local/writereview?placeid="+d.placeId;
+    }
+    const stars=d.rating?("★".repeat(Math.round(d.rating))+` ${d.rating}`):"—";
+    const webLine=d.website
+      ? `<br>Website: ${d.website}`
+      : `<br><span style="color:#8a6d3b">No website on the Google listing — add it below if you have one.</span>`;
+    resBox.innerHTML=`✓ Found: <b>${d.name}</b><br>${d.address||""}<br>Rating: ${stars} (${d.reviewCount||0} reviews)${webLine}<br><span style="color:#7d7a6f;font-size:12px">Not the right place? Edit the name/address fields below before continuing.</span>`;
+    resBox.style.display="block";
+    document.getElementById("extract").disabled=false;
+  }catch(e){errBox.textContent="Something went wrong reaching Google.";errBox.style.display="block";}
+  btn.textContent=orig;
+};
+
+document.getElementById("extract").onclick=async()=>{
+  CFG.name=iName.value.trim();CFG.loc=document.getElementById("iLoc").value.trim();
+  CFG.type=document.getElementById("iType").value;
+  CFG.google=document.getElementById("iGoogle").value.trim()||CFG.google;
+  CFG.placeId=document.getElementById("iPlaceId").value.trim();
+  CFG.website=document.getElementById("iWebsite").value.trim();
+  CFG.email=document.getElementById("iEmail").value.trim();CFG.crest="Guest Reflections";
+  show("o-loading");
+  try{
+    const r=await fetch("/api/extract",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({name:CFG.name,type:CFG.type,loc:CFG.loc,
+        source:document.getElementById("iSource").value.trim(),
+        websiteUrl:CFG.website,placeId:CFG.placeId})});
+    if(!r.ok)throw new Error();
+    const d=await r.json();CFG.chips=d.groups;CFG._sources=d.sources;
+    if(d.resolvedPlaceId)CFG.placeId=d.resolvedPlaceId;
+    renderEditor();show("o-edit");
+  }catch(e){CFG.chips=FALLBACK[CFG.type]||FALLBACK.generic;renderEditor();show("o-edit");}
+};
+
+function renderEditor(){const wrap=document.getElementById("exGroups");wrap.innerHTML="";
+  if(CFG._sources){const s=CFG._sources;
+    const tag=(ok,label)=>`<span style="display:inline-block;margin:0 6px 6px 0;padding:4px 10px;border-radius:20px;font-size:12px;${ok?'background:#e3ede0;color:#2f3b32;border:1px solid #c4d6bd':'background:#f0ece3;color:#a39c8d;border:1px solid #ddd3c2'}">${ok?'✓':'—'} ${label}</span>`;
+    const banner=document.createElement("div");banner.style.cssText="margin-bottom:14px;text-align:center";
+    banner.innerHTML=tag(s.website,"Website")+tag(s.google,"Google reviews")+tag(s.pasted,"Pasted reviews");
+    wrap.appendChild(banner);}
+  CFG.chips.forEach((g,gi)=>{const div=document.createElement("div");div.className="ex-group";div.style.animationDelay=(gi*.06)+"s";
+    div.innerHTML=`<h4>${g.h}</h4>`;const cw=document.createElement("div");cw.className="chips";
+    g.c.forEach((label,ci)=>{const c=document.createElement("div");c.className="chip sel";
+      c.innerHTML=`${label} <span class="x">✕</span>`;c.onclick=()=>{g.c.splice(ci,1);renderEditor();};cw.appendChild(c);});
+    const add=document.createElement("div");add.className="chip chip-add";add.textContent="+ add";
+    add.onclick=()=>{const v=window.prompt("New chip label:");if(v){g.c.push(v);renderEditor();}};
+    cw.appendChild(add);div.appendChild(cw);wrap.appendChild(div);});}
+document.getElementById("backInput").onclick=()=>show("o-input");
+document.getElementById("backEdit").onclick=()=>show("o-edit");
+
+document.getElementById("toQR").onclick=async()=>{
+  const btn=document.getElementById("toQR");const orig=btn.textContent;btn.textContent="Saving…";
+  let url;
+  try{
+    const r=await fetch("/api/save-config",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({config:CFG,id:CFG._id||null})});
+    const d=await r.json();
+    if(!r.ok||!d.id)throw new Error();
+    CFG._id=d.id;
+    // SHORT url → sparse, easy-to-scan QR
+    url=location.origin+location.pathname+"?v="+d.id;
+  }catch(e){
+    // fallback to legacy blob if save fails
+    url=location.origin+location.pathname+"?b="+btoa(unescape(encodeURIComponent(JSON.stringify(CFG))));
+  }
+  btn.textContent=orig;
+  document.getElementById("qrName").textContent=CFG.name;
+  document.getElementById("qrLink").textContent=url;document.getElementById("qrLink").href=url;
+  // High error-correction (Q), generous quiet zone, large size = robust real-world scanning
+  document.getElementById("qrImg").src=
+    "https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=16&ecc=Q&data="+encodeURIComponent(url);
+  show("o-qr");
+};
+document.getElementById("previewAsGuest").onclick=()=>switchMode("guest");
+
+function applyGuestConfig(){document.getElementById("gName").textContent=CFG.name;
+  document.getElementById("gLoc").textContent=CFG.loc;
+  document.getElementById("gCrest").textContent=CFG.crest||"Guest Reflections";
+  const wrap=document.getElementById("gChips");wrap.innerHTML="";
+  (CFG.chips||FALLBACK.generic).forEach((g,gi)=>{const div=document.createElement("div");div.className="group";div.style.animationDelay=(gi*.06)+"s";
+    div.innerHTML=`<h3>${g.h}</h3>`;const cw=document.createElement("div");cw.className="chips";
+    g.c.forEach(label=>{const c=document.createElement("div");c.className="chip";c.textContent=label;
+      c.onclick=()=>{c.classList.toggle("sel");c.classList.contains("sel")?state.chips.add(label):state.chips.delete(label);};
+      cw.appendChild(c);});div.appendChild(cw);wrap.appendChild(div);});}
+
+const gStars=[...document.querySelectorAll("#gStars .star")];
+gStars.forEach(s=>s.onclick=()=>{state.rating=+s.dataset.v;
+  gStars.forEach(x=>x.classList.toggle("on",+x.dataset.v<=state.rating));
+  document.getElementById("gRatingWord").textContent=RATING_WORDS[state.rating];
+  document.getElementById("gContinue").disabled=false;});
+document.getElementById("gContinue").onclick=()=>{state.rating<=2?show("g-improve"):show("g-details");};
+document.getElementById("gBack").onclick=()=>show("g-start");
+document.getElementById("improveToPublic").onclick=()=>show("g-details");
+
+async function sendFeedback(message,guestReview){
+  try{await fetch("/api/feedback",{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({ownerEmail:CFG.email,businessName:CFG.name,rating:state.rating,
+      message,guestReview,chips:[...state.chips]})});}catch(e){}
+}
+document.getElementById("sendPrivate").onclick=async()=>{
+  await sendFeedback(document.getElementById("gImprove").value.trim(),"");
+  document.getElementById("sentMsg").textContent=`Your feedback has been sent privately to ${CFG.name}. It genuinely helps.`;
+  show("g-sent");};
+
+document.getElementById("gNote").addEventListener("input",e=>state.note=e.target.value);
+document.querySelectorAll("#gTone .tone").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll("#gTone .tone").forEach(x=>x.classList.remove("sel"));t.classList.add("sel");state.tone=t.dataset.t;});
+document.getElementById("gLang").addEventListener("change",e=>state.lang=e.target.value);
+
+// voice — fixed with permission + error handling
+const gMic=document.getElementById("gMic");
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(SR){let rec=null,base="";
+  gMic.onclick=()=>{
+    if(gMic.classList.contains("rec")){if(rec)rec.stop();return;}
+    rec=new SR();rec.continuous=true;rec.interimResults=true;rec.lang="en-US";
+    base=document.getElementById("gNote").value;
+    rec.onresult=e=>{let t="";for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;
+      const full=(base+" "+t).trim();document.getElementById("gNote").value=full;state.note=full;};
+    rec.onerror=ev=>{gMic.classList.remove("rec");
+      if(ev.error==="not-allowed"||ev.error==="service-not-allowed")
+        alert("Microphone blocked. Allow mic access for this site, or just type your note.");};
+    rec.onend=()=>gMic.classList.remove("rec");
+    try{rec.start();gMic.classList.add("rec");}catch(e){}
+  };
+}else{gMic.style.display="none";}
+
+async function genReview(){show("g-loading");
+  let userMsg="Couldn't reach the writer just now — please try again.";
+  try{const r=await fetch("/api/generate",{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({name:CFG.name,type:CFG.type,loc:CFG.loc,rating:state.rating,
+      chips:[...state.chips],note:state.note,tone:state.tone,lang:state.lang})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.review){ if(d&&d.userMessage)userMsg=d.userMessage; throw new Error(userMsg); }
+    state.review=d.review;
+    document.getElementById("gReviewText").textContent=d.review;
+    document.getElementById("gReviewStars").textContent="★".repeat(state.rating)+"☆".repeat(5-state.rating);
+    show("g-result");
+  }catch(e){
+    show("g-details");
+    let el=document.querySelector(".gen-err");
+    if(!el){el=document.createElement("div");el.className="err gen-err";document.getElementById("gGenerate").before(el);}
+    el.innerHTML=`${userMsg} <button id="retryGen" style="margin-top:8px;display:block;width:100%;border:none;background:var(--forest);color:var(--sand-light);padding:11px;border-radius:10px;font-family:'Outfit';font-weight:600;cursor:pointer">↻ Try again</button>`;
+    const rb=document.getElementById("retryGen");
+    if(rb)rb.onclick=()=>{el.remove();genReview();};
+  }
+}
+document.getElementById("gGenerate").onclick=genReview;
+document.getElementById("gRegen").onclick=genReview;
+
+let postMode="public";
+document.querySelectorAll("#postSeg button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#postSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");postMode=b.dataset.p;
+  const pub=postMode==="public";
+  document.getElementById("gCopyPost").textContent=pub?"Copy & open Google ✦":"Send privately to owner";
+  document.getElementById("publicSteps").style.display=pub?"block":"none";});
+document.getElementById("gCopyPost").onclick=async()=>{
+  const text=document.getElementById("gReviewText").textContent.trim();
+  if(postMode==="private"){await sendFeedback("",text);
+    document.getElementById("sentMsg").textContent=`Your review has been sent privately to ${CFG.name}. Thank you ♡`;
+    show("g-sent");return;}
+  try{await navigator.clipboard.writeText(text);}catch(e){const ta=document.createElement("textarea");
+    ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();}
+  const f=document.getElementById("flash");f.classList.add("show");setTimeout(()=>f.classList.remove("show"),2200);
+  setTimeout(()=>window.open(CFG.google,"_blank"),650);};
+</script>
+</body>
+</html>
