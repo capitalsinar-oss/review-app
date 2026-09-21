@@ -174,6 +174,12 @@
       <input id="iPlaceId" type="hidden">
       <label class="fld">Owner email (for private feedback)</label>
       <input id="iEmail" type="email" placeholder="you@property.com">
+      <label class="fld">Also listed on <span style="text-transform:none;letter-spacing:0;font-weight:400">(guests get a button for each one you tick)</span></label>
+      <div id="iPlatforms" style="display:flex;gap:18px;flex-wrap:wrap;font-size:14.5px">
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" value="airbnb" checked style="width:auto;margin:0"> Airbnb</label>
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" value="booking" checked style="width:auto;margin:0"> Booking.com</label>
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" value="trip" checked style="width:auto;margin:0"> Trip.com</label>
+      </div>
     </div>
     <div class="card">
       <label class="fld">Website URL <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional — auto-read)</span></label>
@@ -281,10 +287,11 @@
       <div class="fstep"><div class="fnum">3</div><p>Hit <b>Post</b>. Thank you! ♡</p></div></div>
 
     <div id="alsoShare" style="display:none;margin-top:26px;padding:20px;border:1px solid var(--line);border-radius:14px;background:var(--white)">
-      <div style="font-family:'Fraunces',serif;font-size:17px;color:var(--forest);text-align:center;margin-bottom:6px">Also booked through Airbnb or Booking?</div>
+      <div style="font-family:'Fraunces',serif;font-size:17px;color:var(--forest);text-align:center;margin-bottom:6px">Also booked through another site?</div>
       <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:16px">Your review is still on your clipboard — one tap to share it there too.</div>
-      <button class="btn btn-primary" id="shareAirbnb" style="margin-top:0">Share on Airbnb ✦</button>
+      <button class="btn btn-primary" id="shareAirbnb" style="margin-top:0;background:#FF385C">Share on Airbnb ✦</button>
       <button class="btn btn-primary" id="shareBooking" style="margin-top:10px;background:#003580">Share on Booking.com ✦</button>
+      <button class="btn btn-primary" id="shareTrip" style="margin-top:10px;background:#287DFA">Share on Trip.com ✦</button>
       <button class="btn btn-ghost" id="shareDone">No thanks, I'm done →</button>
     </div>
 
@@ -407,6 +414,7 @@ document.getElementById("extract").onclick=async()=>{
   CFG.placeId=document.getElementById("iPlaceId").value.trim();
   CFG.website=document.getElementById("iWebsite").value.trim();
   CFG.email=document.getElementById("iEmail").value.trim();CFG.crest="Guest Reflections";
+  CFG.platforms=[...document.querySelectorAll("#iPlatforms input:checked")].map(x=>x.value);
   if(!adminToken()){showAuthErr("Enter your owner access token first.");return;}
   clearAuthErr();
   show("o-loading");
@@ -590,6 +598,11 @@ document.getElementById("gCopyPost").onclick=async()=>{
   const f=document.getElementById("flash");f.classList.add("show");setTimeout(()=>f.classList.remove("show"),2200);
   setTimeout(()=>window.open(CFG.google,"_blank"),650);
   // reveal the "also share on Airbnb/Booking" panel after they've posted publicly
+  const plats=Array.isArray(CFG.platforms)?CFG.platforms:["airbnb","booking","trip"];
+  document.getElementById("shareAirbnb").style.display=plats.includes("airbnb")?"block":"none";
+  document.getElementById("shareBooking").style.display=plats.includes("booking")?"block":"none";
+  document.getElementById("shareTrip").style.display=plats.includes("trip")?"block":"none";
+  if(!plats.length)return;
   document.getElementById("alsoShare").style.display="block";
   document.getElementById("alsoShare").scrollIntoView({behavior:"smooth",block:"nearest"});
 };
@@ -605,6 +618,7 @@ async function shareTo(platform,url){
 }
 document.getElementById("shareAirbnb").onclick=()=>shareTo("Airbnb","https://www.airbnb.com/trips/v1");
 document.getElementById("shareBooking").onclick=()=>shareTo("Booking.com","https://secure.booking.com/myreviews.html");
+document.getElementById("shareTrip").onclick=()=>shareTo("Trip.com","https://www.trip.com/order/all");
 document.getElementById("shareDone").onclick=()=>{document.getElementById("alsoShare").style.display="none";};
 </script>
 </body>
