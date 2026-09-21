@@ -145,6 +145,12 @@
       <div class="biz-name" style="font-size:27px">Set up a property</div><div class="rule"></div></header>
     <div class="sub">Paste your Google Maps link. We'll pull your name, address &amp; reviews —<br>then you can add a website and Airbnb reviews if you like.</div>
     <div class="card">
+      <label class="fld">Owner access token</label>
+      <input id="iAdminToken" type="password" placeholder="your ADMIN_TOKEN" autocomplete="off">
+      <div class="hint">Setup and exports are owner-only. Entered once, then remembered on this device. Guests never see this screen.</div>
+      <div id="authErr" style="display:none;margin-top:12px" class="err"></div>
+    </div>
+    <div class="card">
       <label class="fld">Google Maps link <span style="text-transform:none;letter-spacing:0;font-weight:400">(required)</span></label>
       <div class="note-row">
         <input id="iMaps" placeholder="Paste your Maps share link or business URL">
@@ -204,6 +210,8 @@
     <div class="sub">Print it for the villa, the table, the checkout counter.</div>
     <div class="card qr-out"><img id="qrImg" alt="QR code"><a class="linkbox" id="qrLink" target="_blank"></a></div>
     <button class="btn btn-gold" id="previewAsGuest">Preview the guest experience →</button>
+    <a id="exportThis" class="btn btn-ghost" style="display:block;text-decoration:none;text-align:center" target="_blank">⤓ Export this villa's reviews (CSV)</a>
+    <a id="exportAll" class="btn btn-ghost" href="/api/export-all.csv" style="display:block;text-decoration:none;text-align:center" target="_blank">⤓ Export ALL villas' reviews (CSV)</a>
     <button class="btn btn-ghost" id="backEdit">← Edit chips</button>
   </section>
 
@@ -271,6 +279,15 @@
       <div class="fstep"><div class="fnum">1</div><p>We've <b>copied</b> your review.</p></div>
       <div class="fstep"><div class="fnum">2</div><p>Google opens — <b>tap the box</b> &amp; <b>paste</b>.</p></div>
       <div class="fstep"><div class="fnum">3</div><p>Hit <b>Post</b>. Thank you! ♡</p></div></div>
+
+    <div id="alsoShare" style="display:none;margin-top:26px;padding:20px;border:1px solid var(--line);border-radius:14px;background:var(--white)">
+      <div style="font-family:'Fraunces',serif;font-size:17px;color:var(--forest);text-align:center;margin-bottom:6px">Also booked through Airbnb or Booking?</div>
+      <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:16px">Your review is still on your clipboard — one tap to share it there too.</div>
+      <button class="btn btn-primary" id="shareAirbnb" style="margin-top:0">Share on Airbnb ✦</button>
+      <button class="btn btn-primary" id="shareBooking" style="margin-top:10px;background:#003580">Share on Booking.com ✦</button>
+      <button class="btn btn-ghost" id="shareDone">No thanks, I'm done →</button>
+    </div>
+
     <div class="footer-note">You're posting under your own Google account, in your own words.</div>
   </section>
 
@@ -317,6 +334,22 @@ function switchMode(m){document.getElementById("mOwner").classList.toggle("on",m
 document.getElementById("mOwner").onclick=()=>switchMode("owner");
 document.getElementById("mGuest").onclick=()=>switchMode("guest");
 
+// --- owner token: kept on this device only, sent as a header on owner routes ---
+// localStorage is per-browser and never leaves it; guests reach the app via ?v=…
+// and never load this screen, so nothing here is exposed to them.
+const iAdminToken=document.getElementById("iAdminToken");
+try{iAdminToken.value=localStorage.getItem("rs_admin_token")||"";}catch(e){}
+iAdminToken.addEventListener("input",()=>{
+  try{localStorage.setItem("rs_admin_token",iAdminToken.value.trim());}catch(e){}
+  refreshExportLinks();
+});
+function adminToken(){return iAdminToken.value.trim();}
+function adminHeaders(extra){return Object.assign({"x-admin-token":adminToken()},extra||{});}
+function showAuthErr(msg){const b=document.getElementById("authErr");
+  b.textContent=msg||"That owner token wasn't accepted. Check it against ADMIN_TOKEN on the server.";
+  b.style.display="block";b.scrollIntoView({behavior:"smooth",block:"center"});}
+function clearAuthErr(){document.getElementById("authErr").style.display="none";}
+
 const iName=document.getElementById("iName");
 iName.addEventListener("input",()=>document.getElementById("extract").disabled=!iName.value.trim());
 
@@ -327,10 +360,14 @@ document.getElementById("resolveMaps").onclick=async()=>{
   const errBox=document.getElementById("mapsErr");
   resBox.style.display="none";errBox.style.display="none";
   if(!url){errBox.textContent="Paste your Google Maps link first.";errBox.style.display="block";return;}
+  if(!adminToken()){showAuthErr("Enter your owner access token first.");return;}
+  clearAuthErr();
   const btn=document.getElementById("resolveMaps");const orig=btn.textContent;btn.textContent="…";
   try{
-    const r=await fetch("/api/resolve-maps",{method:"POST",headers:{"content-type":"application/json"},
+    const r=await fetch("/api/resolve-maps",{method:"POST",headers:adminHeaders({"content-type":"application/json"}),
       body:JSON.stringify({mapsUrl:url})});
+    if(r.status===401){showAuthErr();btn.textContent=orig;return;}
+    if(r.status===500){showAuthErr("The server has no ADMIN_TOKEN configured yet — set it in Render's environment.");btn.textContent=orig;return;}
     const d=await r.json();
     if(!d.ok){errBox.textContent=d.reason||"Couldn't read that link.";errBox.style.display="block";btn.textContent=orig;return;}
     // fill the fields
@@ -370,12 +407,16 @@ document.getElementById("extract").onclick=async()=>{
   CFG.placeId=document.getElementById("iPlaceId").value.trim();
   CFG.website=document.getElementById("iWebsite").value.trim();
   CFG.email=document.getElementById("iEmail").value.trim();CFG.crest="Guest Reflections";
+  if(!adminToken()){showAuthErr("Enter your owner access token first.");return;}
+  clearAuthErr();
   show("o-loading");
   try{
-    const r=await fetch("/api/extract",{method:"POST",headers:{"content-type":"application/json"},
+    const r=await fetch("/api/extract",{method:"POST",headers:adminHeaders({"content-type":"application/json"}),
       body:JSON.stringify({name:CFG.name,type:CFG.type,loc:CFG.loc,
         source:document.getElementById("iSource").value.trim(),
         websiteUrl:CFG.website,placeId:CFG.placeId})});
+    // An auth failure is a fixable mistake, not a reason to fall back to generic chips.
+    if(r.status===401){show("o-input");showAuthErr();return;}
     if(!r.ok)throw new Error();
     const d=await r.json();CFG.chips=d.groups;CFG._sources=d.sources;
     if(d.resolvedPlaceId)CFG.placeId=d.resolvedPlaceId;
@@ -403,8 +444,11 @@ document.getElementById("toQR").onclick=async()=>{
   const btn=document.getElementById("toQR");const orig=btn.textContent;btn.textContent="Saving…";
   let url;
   try{
-    const r=await fetch("/api/save-config",{method:"POST",headers:{"content-type":"application/json"},
+    const r=await fetch("/api/save-config",{method:"POST",headers:adminHeaders({"content-type":"application/json"}),
       body:JSON.stringify({config:CFG,id:CFG._id||null})});
+    // Don't silently fall back to a legacy ?b= link on an auth failure — that link
+    // carries the owner email in the QR and skips server-side logging entirely.
+    if(r.status===401){btn.textContent=orig;show("o-input");showAuthErr();return;}
     const d=await r.json();
     if(!r.ok||!d.id)throw new Error();
     CFG._id=d.id;
@@ -420,8 +464,18 @@ document.getElementById("toQR").onclick=async()=>{
   // High error-correction (Q), generous quiet zone, large size = robust real-world scanning
   document.getElementById("qrImg").src=
     "https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=16&ecc=Q&data="+encodeURIComponent(url);
+  refreshExportLinks();
   show("o-qr");
 };
+// The CSV routes are token-guarded, so the download links have to carry it.
+function refreshExportLinks(){
+  const t=encodeURIComponent(adminToken());
+  const one=document.getElementById("exportThis");
+  const all=document.getElementById("exportAll");
+  if(CFG._id)one.href="/api/export/"+CFG._id+".csv?token="+t;
+  all.href="/api/export-all.csv?token="+t;
+}
+refreshExportLinks();
 document.getElementById("previewAsGuest").onclick=()=>switchMode("guest");
 
 function applyGuestConfig(){document.getElementById("gName").textContent=CFG.name;
@@ -534,7 +588,24 @@ document.getElementById("gCopyPost").onclick=async()=>{
   try{await navigator.clipboard.writeText(text);}catch(e){const ta=document.createElement("textarea");
     ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();}
   const f=document.getElementById("flash");f.classList.add("show");setTimeout(()=>f.classList.remove("show"),2200);
-  setTimeout(()=>window.open(CFG.google,"_blank"),650);};
+  setTimeout(()=>window.open(CFG.google,"_blank"),650);
+  // reveal the "also share on Airbnb/Booking" panel after they've posted publicly
+  document.getElementById("alsoShare").style.display="block";
+  document.getElementById("alsoShare").scrollIntoView({behavior:"smooth",block:"nearest"});
+};
+
+// --- Airbnb / Booking share buttons: re-copy the review, open the platform, log which they used ---
+async function shareTo(platform,url){
+  const text=document.getElementById("gReviewText").textContent.trim();
+  try{await navigator.clipboard.writeText(text);}catch(e){}
+  const f=document.getElementById("flash");f.textContent="Copied ✓ — paste on "+platform;f.classList.add("show");
+  setTimeout(()=>{f.classList.remove("show");f.textContent="Copied ✓";},2200);
+  await logSubmission({review:text,posted:"public+"+platform.toLowerCase()});
+  setTimeout(()=>window.open(url,"_blank"),500);
+}
+document.getElementById("shareAirbnb").onclick=()=>shareTo("Airbnb","https://www.airbnb.com/trips/v1");
+document.getElementById("shareBooking").onclick=()=>shareTo("Booking.com","https://secure.booking.com/myreviews.html");
+document.getElementById("shareDone").onclick=()=>{document.getElementById("alsoShare").style.display="none";};
 </script>
 </body>
 </html>

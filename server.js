@@ -44,7 +44,97 @@ const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const RESEND_KEY    = process.env.RESEND_API_KEY;
 const GOOGLE_KEY    = process.env.GOOGLE_MAPS_API_KEY; // for live Google reviews
 const FROM_EMAIL    = process.env.FROM_EMAIL || "feedback@yourdomain.com";
+const ADMIN_TOKEN   = process.env.ADMIN_TOKEN || ""; // owner-only routes refuse without matching token
 const MODEL         = "claude-sonnet-4-6"; // current model (Sonnet 4.6)
+
+// Google Sheets mirror (optional). Set both to enable.
+// SHEETS_WEBHOOK_URL is the /exec URL of the Apps Script web app; SHEETS_SECRET is
+// a shared string that script checks, so a stranger who finds the URL can't write rows.
+const SHEETS_WEBHOOK_URL = process.env.SHEETS_WEBHOOK_URL || "";
+const SHEETS_SECRET      = process.env.SHEETS_SECRET || "";
+
+// --- middleware: admin-only guard for owner routes (config writes, CRM reads, exports) ---
+// Constant-time compare so the token can't be guessed a character at a time.
+function tokenMatches(provided) {
+  const a = Buffer.from(String(provided));
+  const b = Buffer.from(ADMIN_TOKEN);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+function requireAdmin(req, res, next) {
+  const provided = req.query.token || req.headers["x-admin-token"] || "";
+  if (!ADMIN_TOKEN) return res.status(500).send("Admin token not configured on server.");
+  if (!tokenMatches(provided)) return res.status(401).send("Unauthorized. Add ?token=YOUR_ADMIN_TOKEN to the URL.");
+  next();
+}
+
+// --- crude in-memory rate limit -------------------------------------------
+// /api/generate must stay open to guests (they arrive by QR with no credentials),
+// so it's the one route a stranger could hammer to burn Anthropic credit.
+// Cap each IP to a sane number of generations per window. Resets on restart,
+// which is fine — this is a cost guard, not a security boundary.
+const RATE = { windowMs: 10 * 60 * 1000, max: 20, hits: new Map() };
+function rateLimit(req, res, next) {
+  const ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.ip || "unknown";
+  const now = Date.now();
+  const rec = RATE.hits.get(ip);
+  if (!rec || now > rec.reset) {
+    RATE.hits.set(ip, { count: 1, reset: now + RATE.windowMs });
+  } else {
+    rec.count++;
+    if (rec.count > RATE.max) {
+      return res.status(429).json({
+        error: "rate_limited",
+        userMessage: "That's a lot of rewrites in a short time — please wait a few minutes and try again.",
+      });
+    }
+  }
+  // Keep the map from growing forever on a long-lived process.
+  if (RATE.hits.size > 5000) {
+    for (const [k, v] of RATE.hits) if (now > v.reset) RATE.hits.delete(k);
+  }
+  next();
+}
+
+// --- helper: mirror one submission into the Google Sheet -------------------
+// Fire-and-forget: a Sheets outage must never break a guest's submission, so
+// failures are logged and swallowed. The sheet is a mirror, not the source of
+// truth — configs.json on the persistent disk stays authoritative.
+async function pushToSheet(row) {
+  if (!SHEETS_WEBHOOK_URL) return { ok: false, reason: "not configured" };
+  try {
+    const r = await fetch(SHEETS_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(Object.assign({ secret: SHEETS_SECRET }, row)),
+      redirect: "follow", // Apps Script /exec always 302s to its script.googleusercontent.com runner
+    });
+    if (!r.ok) {
+      console.error("sheet push failed:", r.status, (await r.text()).slice(0, 300));
+      return { ok: false, reason: "http " + r.status };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error("sheet push error:", e.message);
+    return { ok: false, reason: e.message };
+  }
+}
+
+// One shape for a sheet row, used by both the live append and the backfill,
+// so the columns can never drift apart between the two paths.
+function sheetRow(propertyId, rec, s) {
+  return {
+    date: s.at,
+    property: rec.name || "",
+    property_id: propertyId,
+    rating: s.rating || "",
+    outcome: s.posted || "",
+    language: s.lang || "",
+    chips: (s.chips || []).join("; "),
+    review: s.review || "",
+    private_feedback: s.feedback || "",
+  };
+}
 
 
 // --- helper: fetch & strip a public web page to plain text ---
@@ -246,7 +336,8 @@ async function callClaude(prompt) {
 }
 
 // === 0. RESOLVE a Google Maps link → name, address, rating, placeId ===
-app.post("/api/resolve-maps", async (req, res) => {
+// Owner-only: setup step, and it spends Google Places credit.
+app.post("/api/resolve-maps", requireAdmin, async (req, res) => {
   try {
     const { mapsUrl } = req.body;
     if (!mapsUrl) return res.status(400).json({ error: "no maps url" });
@@ -323,7 +414,9 @@ app.post("/api/resolve-maps", async (req, res) => {
 });
 
 // === SAVE a property config → returns a short id for the QR ===
-app.post("/api/save-config", (req, res) => {
+// Owner-only: an open version of this lets a stranger repoint any property's
+// owner email (stealing the private feedback) or its Google review link.
+app.post("/api/save-config", requireAdmin, (req, res) => {
   try {
     const cfg = req.body && req.body.config;
     if (!cfg || !cfg.name) return res.status(400).json({ error: "missing config" });
@@ -371,7 +464,7 @@ app.post("/api/log-submission", (req, res) => {
     const rec = store[propertyId];
     if (!rec) return res.status(404).json({ error: "unknown property" });
     if (!rec.submissions) rec.submissions = [];
-    rec.submissions.push({
+    const entry = {
       at: new Date().toISOString(),
       rating: rating || null,
       chips: chips || [],
@@ -379,8 +472,11 @@ app.post("/api/log-submission", (req, res) => {
       feedback: feedback || "",
       posted: posted || "",      // "public" | "private" | "rating-only"
       lang: lang || "",
-    });
+    };
+    rec.submissions.push(entry);
     saveStore(store);
+    // Mirror to the Google Sheet without making the guest wait on it.
+    pushToSheet(sheetRow(propertyId, rec, entry));
     res.json({ ok: true });
   } catch (e) {
     console.error(e);
@@ -389,7 +485,9 @@ app.post("/api/log-submission", (req, res) => {
 });
 
 // === OWNER: retrieve collected submissions (CRM) for a property ===
-app.get("/api/submissions/:id", (req, res) => {
+// Owner-only: property IDs travel in the public QR URL, so without this guard
+// anyone who scanned a code could read every guest's private feedback.
+app.get("/api/submissions/:id", requireAdmin, (req, res) => {
   const store = loadStore();
   const rec = store[req.params.id];
   if (!rec) return res.status(404).json({ error: "not found" });
@@ -406,8 +504,91 @@ app.get("/api/submissions/:id", (req, res) => {
   });
 });
 
+// --- helper: turn rows into CSV safely (quotes, commas, newlines handled) ---
+function toCsv(headers, rows) {
+  const esc = (v) => {
+    const s = (v === null || v === undefined) ? "" : String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const lines = [headers.join(",")];
+  for (const r of rows) lines.push(headers.map(h => esc(r[h])).join(","));
+  return lines.join("\n");
+}
+
+// === OWNER: download CSV of one property's submissions ===
+app.get("/api/export/:id.csv", requireAdmin, (req, res) => {
+  const store = loadStore();
+  const rec = store[req.params.id];
+  if (!rec) return res.status(404).send("not found");
+  const rows = (rec.submissions || []).map(s => ({
+    property: rec.name,
+    date: s.at,
+    rating: s.rating,
+    outcome: s.posted,
+    language: s.lang,
+    chips: (s.chips || []).join("; "),
+    review: s.review,
+    private_feedback: s.feedback,
+  }));
+  const csv = toCsv(["property","date","rating","outcome","language","chips","review","private_feedback"], rows);
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="${(rec.name||"property").replace(/[^a-z0-9]+/gi,"_")}_reviews.csv"`);
+  res.send(csv);
+});
+
+// === OWNER: download CSV of ALL properties' submissions ===
+app.get("/api/export-all.csv", requireAdmin, (req, res) => {
+  const store = loadStore();
+  const rows = [];
+  for (const id of Object.keys(store)) {
+    const rec = store[id];
+    for (const s of (rec.submissions || [])) {
+      rows.push({
+        property: rec.name,
+        property_id: id,
+        date: s.at,
+        rating: s.rating,
+        outcome: s.posted,
+        language: s.lang,
+        chips: (s.chips || []).join("; "),
+        review: s.review,
+        private_feedback: s.feedback,
+      });
+    }
+  }
+  const csv = toCsv(["property","property_id","date","rating","outcome","language","chips","review","private_feedback"], rows);
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", 'attachment; filename="all_reviews.csv"');
+  res.send(csv);
+});
+
+// === OWNER: replay every stored submission into the Google Sheet ===
+// Use after first connecting a sheet, or if the sheet ever falls behind.
+// The Apps Script de-duplicates on (property_id, date), so running this twice
+// is safe and will not double up rows.
+app.get("/api/sync-sheet", requireAdmin, async (req, res) => {
+  if (!SHEETS_WEBHOOK_URL) return res.status(400).json({ error: "SHEETS_WEBHOOK_URL not set on the server." });
+  const store = loadStore();
+  const rows = [];
+  for (const id of Object.keys(store)) {
+    const rec = store[id];
+    for (const s of (rec.submissions || [])) rows.push(sheetRow(id, rec, s));
+  }
+  if (!rows.length) return res.json({ ok: true, sent: 0, note: "No submissions stored yet." });
+  // Send in batches so one huge POST can't time out.
+  let sent = 0;
+  const failures = [];
+  for (let i = 0; i < rows.length; i += 100) {
+    const batch = rows.slice(i, i + 100);
+    const r = await pushToSheet({ rows: batch });
+    if (r.ok) sent += batch.length; else failures.push(r.reason);
+  }
+  res.json({ ok: failures.length === 0, sent, total: rows.length, failures });
+});
+
 // === 1. EXTRACTION: combine website + Google reviews + pasted text into chips ===
-app.post("/api/extract", async (req, res) => {
+// Owner-only: this is a setup step, and it spends Anthropic + Google Places credit.
+app.post("/api/extract", requireAdmin, async (req, res) => {
   try {
     const { name, type, loc, source: rawSource, websiteUrl, placeId } = req.body;
     // Cap the pasted reviews so a huge paste can't dominate by sheer volume.
@@ -469,7 +650,7 @@ Return ONLY valid JSON, no markdown fences, in this exact shape:
 });
 
 // === 2. REVIEW GENERATION ===
-app.post("/api/generate", async (req, res) => {
+app.post("/api/generate", rateLimit, async (req, res) => {
   try {
     const { name, type, loc, rating, chips, note, tone, lang } = req.body;
     const typeWord = type === "restaurant" ? "restaurant/café"
@@ -507,7 +688,7 @@ app.post("/api/feedback", async (req, res) => {
 
     const html = `
       <div style="font-family:Georgia,serif;color:#33352f;max-width:560px">
-        <h2 style="color:#2f3b32">Private guest feedback — ${businessName}</h2>
+        <h2 style="color:#2f3b32">Private guest feedback — ${escapeHtml(businessName || "")}</h2>
         <p style="font-size:18px;color:#b08f6a">${"★".repeat(rating||0)}${"☆".repeat(5-(rating||0))}</p>
         ${message ? `<p><b>What could be better:</b><br>${escapeHtml(message)}</p>` : ""}
         ${guestReview ? `<p><b>Their review text:</b><br>${escapeHtml(guestReview)}</p>` : ""}

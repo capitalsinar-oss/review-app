@@ -15,8 +15,65 @@ email, and keeping those keys off the user's phone. The server handles all three
 
 - `server.js`        — the backend (Claude calls + Resend email). Holds your keys.
 - `public/index.html`— the whole front-end (owner setup + guest flow).
+- `sheets-sync.gs`   — Apps Script for the Google Sheets mirror (see below).
 - `package.json`     — dependencies.
 - `.env.example`     — copy to `.env` and add your keys.
+
+---
+
+## Who can call what
+
+Guests arrive by QR at `?v=<id>` and never see the owner screen. Only three
+routes are open to them — reading a property's public config, generating a
+review, and sending private feedback. Everything else requires `ADMIN_TOKEN`,
+sent as an `x-admin-token` header or a `?token=` query parameter:
+
+| Route | Who |
+|---|---|
+| `GET /api/config/:id` | public — guest's own property, submissions stripped |
+| `POST /api/generate` | public — rate-limited to 20 per IP per 10 min |
+| `POST /api/feedback` | public |
+| `POST /api/log-submission` | public |
+| `POST /api/resolve-maps` | **owner** — spends Google Places credit |
+| `POST /api/extract` | **owner** — spends Anthropic + Places credit |
+| `POST /api/save-config` | **owner** — could repoint an owner email otherwise |
+| `GET /api/submissions/:id` | **owner** — every guest's private feedback |
+| `GET /api/export/:id.csv` | **owner** |
+| `GET /api/export-all.csv` | **owner** |
+| `GET /api/sync-sheet` | **owner** |
+
+Set `ADMIN_TOKEN` to a long random string (`openssl rand -hex 24`). The owner
+screen asks for it once and keeps it in that browser's local storage.
+
+**Without `ADMIN_TOKEN` set, every owner route returns 500 and setup won't run.**
+That's deliberate — a blank token must never mean "open to everyone."
+
+---
+
+## Google Sheets sync
+
+Mirrors every submission into a sheet, so you and your team can read the data
+without the admin token and without downloading CSVs. The sheet is a mirror:
+`configs.json` on the Render disk stays the source of truth, and a Sheets
+outage can never break a guest's submission.
+
+1. Make a new Google Sheet. **Extensions → Apps Script**.
+2. Delete the placeholder code, paste in all of `sheets-sync.gs`, save.
+3. **Project Settings → Script Properties → Add script property**:
+   key `SHEETS_SECRET`, value a long random string.
+4. **Deploy → New deployment → Web app**.
+   - Execute as: **Me**
+   - Who has access: **Anyone**  ← required; the secret is what actually guards it
+   - Deploy, authorise, copy the `/exec` URL.
+5. On Render, add two environment variables:
+   - `SHEETS_WEBHOOK_URL` = the `/exec` URL
+   - `SHEETS_SECRET` = the same string as step 3
+6. Redeploy, then backfill everything already collected:
+   `https://your-app.onrender.com/api/sync-sheet?token=YOUR_ADMIN_TOKEN`
+
+Rows de-duplicate on (property_id, date), so step 6 is safe to re-run any time
+the sheet falls behind. Re-deploying the Apps Script creates a *new* `/exec`
+URL — update `SHEETS_WEBHOOK_URL` when you do.
 
 ---
 
