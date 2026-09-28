@@ -1,0 +1,15 @@
+{
+  "name": "review-studio",
+  "version": "1.0.0",
+  "description": "QR review generator with AI writing + private feedback email",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
