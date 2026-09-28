@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Review Grader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:light;
+  --ink:#2B2140; --cream:#FFF8EE; --yellow:#FFD84D; --mint:#7FE0B8; --lav:#BFA8FF; --pink:#FF7EB3; --lilac:#EDE6FF; --mute:#6B5E7B; --mute2:#4A3D5C; --purple:#5A3E8A; --white:#FFFFFF; --sand:#F1ECE3; --admin:#F4F0FA;
+  --airbnb:#FF5A5F; --booking:#003580; --trip:#287DFA; --google:#34A853;}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%}
+body{font-family:'Nunito',sans-serif;background:var(--cream);color:var(--ink);font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased}
+a{color:var(--ink)} a:hover{color:var(--purple)}
+button{font-family:inherit;cursor:pointer}
+button:disabled{opacity:.55;cursor:default}
+input,select{font-family:inherit;color:var(--ink)}
+.screen{display:none;min-height:100%;max-width:480px;margin:0 auto;padding:24px 20px 28px;padding-top:calc(24px + env(safe-area-inset-top,0px));flex-direction:column;gap:16px}
+.screen.on{display:flex}
+.screen.withnav{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
+.fred{font-family:'Fredoka',sans-serif;font-weight:700}
+h1{margin:0;font-family:'Fredoka',sans-serif;font-weight:700;font-size:30px;line-height:1.1}
+h2{margin:0;font-family:'Fredoka',sans-serif;font-weight:700;font-size:20px}
+.sub{font-size:14px;font-weight:700;color:var(--mute)}
+.pill{background:var(--ink);color:var(--cream);border-radius:20px;padding:6px 12px;font-size:14px;font-weight:800;letter-spacing:.3px}
+.card{background:var(--white);border:3px solid var(--ink);border-radius:28px;padding:18px}
+.card.shadow{box-shadow:0 6px 0 var(--ink)}
+.card.thin{border-width:2.5px;border-radius:24px;padding:14px 16px}
+.btn{min-height:56px;border:3px solid var(--ink);border-radius:20px;background:var(--ink);color:var(--yellow);font-family:'Fredoka',sans-serif;font-size:18px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;text-decoration:none;box-shadow:0 5px 0 var(--pink);width:100%}
+.btn.plain{background:var(--white);color:var(--ink);box-shadow:none;font-size:17px}
+.btn.flat{box-shadow:none}
+.link{background:none;border:0;padding:0;font-size:15px;font-weight:800;text-decoration:underline;text-underline-offset:3px;min-height:44px;display:inline-flex;align-items:center;color:var(--ink)}
+.row{display:flex;align-items:center;gap:10px}
+.between{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.col{display:flex;flex-direction:column;gap:8px}
+.field{display:flex;flex-direction:column;gap:8px}
+.field label{font-size:15px;font-weight:800}
+.select,.input{height:52px;border:2.5px solid var(--ink);border-radius:16px;padding:0 14px;font-size:17px;font-weight:700;background:var(--cream);width:100%}
+.input.pin{height:56px;font-size:26px;letter-spacing:14px;padding:0 18px}
+.note{background:var(--lilac);border-radius:20px;padding:14px 16px;font-size:15px;line-height:1.4}
+.err{color:#B3261E;font-size:14px;font-weight:800;min-height:1.2em}
+.err:empty{display:none}
+.dot{display:inline-block;width:10px;height:10px;border-radius:5px;margin-right:5px;vertical-align:middle}
+.steps{display:flex;gap:8px}
+.steps div{flex:1 1 0;background:var(--white);border:2.5px solid var(--ink);border-radius:18px;padding:10px;display:flex;flex-direction:column;gap:4px}
+.steps b{font-family:'Fredoka',sans-serif;font-size:20px;font-weight:700}
+.steps span{font-size:13px;font-weight:700;line-height:1.25}
+.hero{position:relative;height:250px;background:var(--lav);border:3px solid var(--ink);border-radius:32px;box-shadow:0 6px 0 var(--ink);overflow:hidden}
+.hero .p{position:absolute}
+.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));width:min(350px,calc(100% - 40px));height:64px;background:var(--ink);border-radius:32px;display:flex;justify-content:space-between;align-items:center;padding:0 26px;z-index:20}
+.nav button{background:none;border:0;color:var(--cream);font-size:12px;font-weight:800;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:44px;min-height:44px;justify-content:center}
+.nav button.on{color:var(--yellow)}
+.nav .star{width:60px;height:60px;border-radius:30px;background:var(--yellow);border:3px solid var(--ink);box-shadow:0 4px 0 var(--pink);display:flex;align-items:center;justify-content:center;margin-top:-30px;color:var(--ink)}
+.stars5{align-self:flex-start;display:flex;gap:4px;background:var(--white);border:2.5px solid var(--ink);border-radius:16px;padding:5px 10px}
+.chips2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.chips2 span{background:var(--cream);border-radius:12px;padding:7px 10px;font-size:13px;font-weight:700;display:flex;justify-content:space-between}
+.tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:6px}
+.tabs button{height:40px;border:2.5px solid var(--ink);border-radius:14px;background:var(--white);font-size:14px;font-weight:800;color:var(--ink)}
+.tabs button.on{background:var(--ink);color:var(--cream)}
+.goal{display:flex;flex-direction:column;gap:6px}
+.goal .bar{height:8px;background:var(--sand);border-radius:4px;overflow:hidden}
+.goal .bar i{display:block;height:100%;border-radius:4px}
+.goal .g{font-size:13px;font-weight:700;color:var(--mute)}
+.sheetbg{position:fixed;inset:0;background:rgba(43,33,64,.55);z-index:30;display:none}
+.sheetbg.on{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-width:480px;margin:0 auto;background:var(--cream);border-radius:28px 28px 0 0;border:3px solid var(--ink);border-bottom:0;padding:14px 20px calc(24px + env(safe-area-inset-bottom,0px));z-index:31;display:none;flex-direction:column;gap:14px;animation:rise .35s ease-out both;max-height:88vh;overflow:auto}
+.sheet.on{display:flex}
+.sheet .grab{width:44px;height:5px;background:var(--ink);border-radius:3px;margin:0 auto}
+.drop{background:var(--mint);border:2.5px dashed var(--ink);border-radius:20px;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:16px;text-align:center;cursor:pointer}
+.drop b{font-size:16px;font-weight:800}
+.drop span{font-size:13px;font-weight:700;color:var(--mute2)}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}
+.thumbs img{height:70px;width:auto;max-width:140px;object-fit:cover;border-radius:12px;border:2px solid var(--ink)}
+.chdots{display:flex;flex-wrap:wrap;gap:6px}
+.chdots span{background:var(--white);border-radius:12px;padding:5px 10px;font-size:12px;font-weight:800}
+.overlay{position:fixed;inset:0;z-index:50;background:var(--cream);display:none;align-items:center;justify-content:center;padding:24px;text-align:center}
+.overlay.on{display:flex}
+.overlay .box{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:320px}
+.overlay .ring{width:84px;height:84px;border-radius:50%;border:4px solid var(--sand);border-top-color:var(--pink);animation:spin 1s linear infinite}
+.overlay .prog{width:220px;height:10px;background:var(--sand);border:2px solid var(--ink);border-radius:6px;overflow:hidden}
+.overlay .prog i{display:block;height:100%;width:0;background:var(--yellow);transition:width 1s linear}
+.pay{background:var(--mint);border:3px solid var(--ink);border-radius:22px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.pay.yellow{background:var(--yellow)}
+.pay b{font-size:16px;font-weight:800;line-height:1.3}
+.pay .amt{font-family:'Fredoka',sans-serif;font-size:22px;font-weight:700;white-space:nowrap}
+.quote{background:var(--cream);border-radius:14px;padding:10px 12px;font-size:15px;font-style:italic;line-height:1.45}
+.tile{border:2.5px solid var(--ink);border-radius:18px;padding:10px;display:flex;flex-direction:column;gap:2px}
+.tile b{font-size:13px;font-weight:800}
+.tile .amt{font-family:'Fredoka',sans-serif;font-size:20px;font-weight:700}
+.tile span{font-size:13px;font-weight:700;line-height:1.25}
+.win{display:flex;gap:12px;align-items:center;background:var(--white);border:2.5px solid var(--ink);border-radius:18px;padding:10px 12px}
+.win.pending{border-style:dashed;border-color:var(--mute)}
+.win .g{width:40px;height:40px;border-radius:20px;background:var(--yellow);border:2.5px solid var(--ink);display:flex;align-items:center;justify-content:center;font-family:'Fredoka',sans-serif;font-weight:700;flex-shrink:0}
+.win.pending .g{background:var(--sand);border-style:dashed;border-color:var(--mute)}
+.win .t{flex:1;display:flex;flex-direction:column;font-size:15px;font-weight:800}
+.win .t small{font-size:13px;font-weight:700;color:var(--mute)}
+.win .t small.named{color:#D6266F}
+.win .amt{font-family:'Fredoka',sans-serif;font-size:18px;font-weight:700;white-space:nowrap}
+.paydays{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.paydays div{border:2.5px solid var(--ink);border-radius:16px;padding:10px;background:var(--white);display:flex;flex-direction:column;gap:2px}
+.paydays div.next{background:var(--ink);color:var(--yellow)}
+.paydays b{font-family:'Fredoka',sans-serif;font-size:17px;font-weight:700}
+.paydays span{font-size:12px;font-weight:700}
+.admin{background:var(--admin)}
+.badge{width:44px;height:44px;border-radius:22px;border:2.5px solid var(--ink);display:flex;align-items:center;justify-content:center;font-family:'Fredoka',sans-serif;font-size:22px;font-weight:700;flex-shrink:0}
+.badge.A{background:var(--yellow)} .badge.B{background:var(--lav)} .badge.C{background:var(--pink)}
+.tag{background:var(--sand);border-radius:10px;padding:4px 8px;font-size:12px;font-weight:800}
+.tag.warn{border:2px dashed var(--mute);background:transparent;color:var(--mute)}
+mark{color:var(--ink);border-radius:5px;padding:1px 3px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.hs{background:#DDF7EC}.hg{background:#F7E3B0}.hl{background:#EDE6FF}
+.ha{background:#F9D9C8;text-decoration:underline wavy #C4643F;text-underline-offset:3px}
+.hf{background:transparent;border:2px dashed var(--mute);color:var(--mute)}
+.sw{display:inline-block;width:18px;height:12px;border-radius:4px;border:1.5px solid var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;font-weight:800}
+.legend span{display:flex;align-items:center;gap:5px}
+.checks{background:var(--cream);border:2px solid var(--ink);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;font-size:14px;font-weight:600;line-height:1.35}
+.abtn{min-height:44px;border-radius:14px;border:2.5px solid var(--ink);font-family:'Fredoka',sans-serif;font-size:15px;font-weight:600;padding:0 14px;flex:1}
+.abtn.dark{background:var(--ink);color:var(--yellow)}
+.abtn.light{background:var(--white);color:var(--ink)}
+.abtn.pink{background:var(--pink);color:var(--ink)}
+.mention{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;padding:4px 0}
+.mention input{width:20px;height:20px}
+.small{font-size:13px;font-weight:600;color:var(--mute)}
+.confetti{position:absolute;top:0;width:9px;height:14px;border-radius:3px;animation:fall 4.2s linear infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes sway{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
+@keyframes twinkle{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+@keyframes rise{0%{transform:translateY(40px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes dance{0%{transform:rotate(-9deg) translateY(0)}25%{transform:rotate(0deg) translateY(-14px)}50%{transform:rotate(9deg) translateY(0)}75%{transform:rotate(0deg) translateY(-14px)}100%{transform:rotate(-9deg) translateY(0)}}
+@keyframes armL{0%,100%{transform:rotate(25deg)}50%{transform:rotate(-35deg)}}
+@keyframes armR{0%,100%{transform:rotate(-35deg)}50%{transform:rotate(25deg)}}
+@keyframes kickL{0%,100%{transform:rotate(0deg)}50%{transform:rotate(22deg)}}
+@keyframes kickR{0%,100%{transform:rotate(-22deg)}50%{transform:rotate(0deg)}}
+@keyframes fall{0%{transform:translateY(-40px) rotate(0deg)}100%{transform:translateY(1040px) rotate(480deg)}}
+@keyframes pop{0%{opacity:0;transform:scale(.8)}70%{opacity:1;transform:scale(1.04)}100%{transform:scale(1)}}
+@keyframes clapL{0%,100%{transform:translateX(0) rotate(-12deg)}50%{transform:translateX(9px) rotate(-4deg)}}
+@keyframes clapR{0%,100%{transform:translateX(0) rotate(12deg)}50%{transform:translateX(-9px) rotate(4deg)}}
+@keyframes burst{0%,40%{opacity:0;transform:scale(.6)}55%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.2)}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+@keyframes beat{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+.bob{animation:bob 3s ease-in-out infinite}.bob2{animation:bob 3.6s ease-in-out .6s infinite}.sway{animation:sway 3s ease-in-out infinite;transform-origin:50% 85%}
+.tw{animation:twinkle 2s ease-in-out infinite}.tw2{animation:twinkle 2.6s ease-in-out .7s infinite}
+.blink{animation:blink 4.5s infinite;transform-origin:center;transform-box:fill-box}
+.s1{animation:twinkle 2.2s ease-in-out infinite}.s2{animation:twinkle 2.2s ease-in-out .2s infinite}.s3{animation:twinkle 2.2s ease-in-out .4s infinite}.s4{animation:twinkle 2.2s ease-in-out .6s infinite}.s5{animation:twinkle 2.2s ease-in-out .8s infinite}
+.dance{animation:dance 1.1s ease-in-out infinite;transform-origin:50% 90%}
+.armL{animation:armL .55s ease-in-out infinite;transform-origin:100% 100%;transform-box:fill-box}.armR{animation:armR .55s ease-in-out infinite;transform-origin:0% 100%;transform-box:fill-box}
+.kickL{animation:kickL .55s ease-in-out infinite;transform-origin:50% 0%;transform-box:fill-box}.kickR{animation:kickR .55s ease-in-out infinite;transform-origin:50% 0%;transform-box:fill-box}
+.pop{animation:pop .5s ease-out both}
+.clapL{animation:clapL 1s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}.clapR{animation:clapR 1s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
+.burst{animation:burst 1s ease-out infinite;transform-box:fill-box;transform-origin:center}
+.breathe{animation:breathe 3.2s ease-in-out infinite;transform-origin:50% 60%}.beat{animation:beat 1.6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+.rise{animation:rise .35s ease-out both}
+@media (prefers-reduced-motion: reduce){*{animation:none!important}}
+footer.site{margin-top:auto;padding-top:20px;text-align:center;font-size:11px;color:var(--mute);line-height:1.5}
+</style>
+</head>
+<body>
+<!-- 0 · Welcome -->
+<section class="screen" id="s-welcome">
+  <div class="between"><span class="pill">Review Grader</span><span class="sub">for our villa teams</span></div>
+  <div class="hero">
+    <span class="p tw" style="left:34px;top:28px" data-face="sparkle"></span>
+    <span class="p bob" style="left:122px;top:30px" data-face="star_big"></span>
+    <span class="p bob2" style="left:26px;top:132px" data-face="smiley"></span>
+    <span class="p sway" style="right:26px;top:126px" data-face="heart"></span>
+  </div>
+  <div class="col">
+    <h1 style="font-size:34px;line-height:1.08">Hello, you. Thank you for all you do.</h1>
+    <p style="margin:0;font-size:17px;line-height:1.45;color:var(--mute2)">Guests remember the little things you do. When they say so in a Grade A review, we celebrate you, and you get paid for it.</p>
+  </div>
+  <div class="steps">
+    <div><b style="color:#FF4F97">1</b><span>A guest writes a glowing review</span></div>
+    <div><b style="color:var(--purple)">2</b><span>You upload it here</span></div>
+    <div><b style="color:#0E9E6E">3</b><span>Cash in on payday</span></div>
+  </div>
+  <button class="btn" data-go="signin">Log in</button>
+  <button class="btn plain" data-go="signin" data-first="1">First time here? Set up my PIN</button>
+  <button class="link" style="align-self:center" data-go="adminlogin">Admin login (BN &amp; owner only)</button>
+  <footer class="site">© <span class="yr">2026</span> Sinar Capital (UEN 202339418Z). All information on this site belongs to Sinar Capital and is confidential.</footer>
+</section>
+
+<!-- 1 · Sign in -->
+<section class="screen" id="s-signin">
+  <button class="link" data-go="welcome" style="text-decoration:none">← Back</button>
+  <div class="row" style="align-items:flex-end">
+    <div class="col" style="flex:1"><h1 style="font-size:32px" id="signin-title">Welcome back</h1><p style="margin:0;color:var(--mute2)" id="signin-sub">Good to see you. Let's check in.</p></div>
+    <span class="bob" data-face="star_signin"></span>
+  </div>
+  <form class="card shadow col" id="f-signin" style="gap:18px;padding:22px 18px">
+    <div class="field"><label for="company">Which management company are you under?</label><select class="select" id="company"><option value="">Choose your company</option></select></div>
+    <div class="field" id="step-villa" hidden><label for="villa">Which villa are you at?</label><select class="select" id="villa"><option value="">Choose your villa</option></select></div>
+    <div class="field" id="step-role" hidden><label for="role">Your designation</label><select class="select" id="role"><option value="">Choose your designation</option></select></div>
+    <div class="col" id="signin-more" hidden style="gap:18px">
+      <div class="field"><label for="who">And you are…</label><select class="select" id="who"><option value="">Choose your name</option></select><span class="small">Work at more than one villa? Pick any of them; it's the same you.</span></div>
+      <div class="field"><label for="pin" id="pin-label">Your 4-digit PIN</label><input class="input pin" id="pin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off"></div>
+    </div>
+    <div class="err" id="signin-err"></div>
+    <button class="btn" type="submit">Let me in</button>
+  </form>
+  <div class="note"><strong>Forgot your PIN? No stress.</strong> Ask your admin (BN or HoR) or the owner to reset it to 8888, then choose a new one when you log in.</div>
+</section>
+
+<!-- 1b · Choose a new PIN -->
+<section class="screen" id="s-newpin">
+  <div class="row" style="align-items:flex-end"><div class="col" style="flex:1"><h1 style="font-size:32px">Choose your PIN</h1><p style="margin:0;color:var(--mute2)">Four digits only you know. You'll use it every time you log in.</p></div><span class="bob" data-face="star_signin"></span></div>
+  <form class="card shadow col" id="f-newpin" style="gap:18px;padding:22px 18px">
+    <div class="field"><label for="pin1">New PIN</label><input class="input pin" id="pin1" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off"></div>
+    <div class="field"><label for="pin2">Same PIN again</label><input class="input pin" id="pin2" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off"></div>
+    <div class="err" id="newpin-err"></div>
+    <button class="btn" type="submit">Save my PIN</button>
+  </form>
+  <div class="note">Not 1234, not 8888, and not four of the same digit.</div>
+</section>
+
+<!-- 2 · Home -->
+<section class="screen withnav" id="s-home">
+  <div class="between" style="align-items:flex-start">
+    <div class="col" style="gap:2px"><span class="sub" id="home-role">·</span><h1 id="home-hi">Hi</h1></div>
+    <button class="link" data-logout style="text-decoration:none;font-size:14px">Log out</button>
+  </div>
+  <section class="card shadow col" style="background:var(--yellow);gap:12px;padding:20px">
+    <div class="stars5" aria-label="Five stars" data-stars5></div>
+    <div class="col" style="gap:4px"><span class="fred" style="font-size:26px;line-height:1.1">Got a Grade A review?</span><span style="font-size:15px;color:var(--mute2)">A guest noticed what you did. Let's celebrate it properly.</span></div>
+    <button class="btn flat" style="font-size:17px;box-shadow:0 5px 0 var(--pink)" data-sheet><span data-face="upload"></span>Upload my Grade A review</button>
+  </section>
+  <a class="card col" href="#stash" data-go="stash" style="background:var(--mint);text-decoration:none;gap:12px;padding:18px 20px">
+    <div class="row" style="gap:12px"><span class="bob" data-face="jar_small"></span>
+      <div class="col" style="gap:0;flex:1"><span style="font-size:14px;font-weight:800;color:var(--purple)" id="home-stash-label">My stash</span><span class="fred" style="font-size:32px;line-height:1.1" id="home-stash">Rp 0</span><span style="font-size:14px;font-weight:700;color:var(--mute2)" id="home-payday"></span></div></div>
+    <div class="chips2" id="home-villas"></div>
+  </a>
+  <section class="card col" style="gap:14px">
+    <div class="col" style="gap:2px"><h2 style="font-size:22px">Our review goals</h2><span class="sub" style="font-weight:600">Tap a villa to see how close each channel is.</span></div>
+    <div class="tabs" id="goal-tabs" role="tablist"></div>
+    <div class="col" id="goal-rows" style="gap:12px"></div>
+  </section>
+  <div class="note" style="font-size:14px"><strong>No new A this week? That's okay.</strong> A Grade A only comes from the happiest guests. Keep doing the little things; they add up.</div>
+</section>
+
+<!-- Upload sheet -->
+<div class="sheetbg" id="sheetbg"></div>
+<div class="sheet" id="sheet" role="dialog" aria-label="Upload your Grade A review">
+  <div class="grab"></div>
+  <div class="between"><h2 style="font-size:22px">Upload your Grade A review</h2><button class="link" id="sheet-close" aria-label="Close" style="font-size:22px;text-decoration:none">×</button></div>
+  <div class="row" style="gap:3px" data-stars5 aria-hidden="true"></div>
+  <div class="field"><label for="upvilla">Which villa was the guest at?</label><select class="select" id="upvilla"></select></div>
+  <div class="drop" id="drop" tabindex="0" role="button"><span data-face="image"></span><b>Choose the screenshot</b><span>Up to 5 · we'll spot the channel for you</span><input type="file" id="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></div>
+  <div class="thumbs" id="thumbs"></div>
+  <div class="chdots"><span><i class="dot" style="background:var(--airbnb)"></i>Airbnb</span><span><i class="dot" style="background:var(--booking)"></i>Booking.com</span><span><i class="dot" style="background:var(--trip)"></i>Trip.com</span><span><i class="dot" style="background:var(--google)"></i>Google</span></div>
+  <div class="err" id="up-err"></div>
+  <button class="btn" id="up-go" disabled>Grade it</button>
+</div>
+
+<!-- Waiting -->
+<div class="overlay" id="overlay" role="alertdialog" aria-live="assertive">
+  <div class="box"><span class="dance" data-face="dancer"></span><h1 id="ov-title">Reading your review</h1><p style="margin:0;font-weight:700;color:var(--mute2)" id="ov-step">Uploading…</p><div class="prog"><i id="ov-prog"></i></div><span class="sub" id="ov-timer">0 s</span><span class="small">Usually 15–40 seconds. If you leave, the result is saved and waits in your stash.</span></div>
+</div>
+
+<!-- 3 · Result -->
+<section class="screen" id="s-result" style="position:relative;overflow:hidden">
+  <div id="confetti" aria-hidden="true"></div>
+  <div class="col" style="gap:14px;position:relative">
+    <button class="link" data-go="home" style="text-decoration:none;align-self:flex-start">← Home</button>
+    <div class="col" style="align-items:center;gap:4px" id="r-top"></div>
+    <div id="r-body" class="col" style="gap:14px"></div>
+    <div id="r-more" class="col" style="gap:8px"></div>
+    <div class="row" style="gap:10px;margin-top:6px"><button class="btn" data-go="stash" style="flex:1">See my stash</button><button class="btn plain" data-go="home" style="width:auto;padding:0 18px">Home</button></div>
+    <button class="link" id="r-second" style="align-self:center;display:none">Think it's an A? Ask an admin for a second look</button>
+  </div>
+</section>
+
+<!-- 4 · My stash -->
+<section class="screen withnav" id="s-stash">
+  <div class="between"><h1>My stash</h1><span class="sub" id="stash-role"></span></div>
+  <div class="card shadow" style="background:var(--mint);border-radius:32px;padding:20px 18px;display:flex;gap:14px;align-items:center;position:relative;overflow:hidden">
+    <span class="tw" style="position:absolute;right:20px;top:16px" data-face="sparkle"></span>
+    <span data-face="jar_big" class="bob"></span>
+    <div class="col" style="gap:2px"><span style="font-size:14px;font-weight:800">Waiting for payday</span><span class="fred" style="font-size:38px;line-height:1.05" id="stash-total">Rp 0</span><span class="pill" style="align-self:flex-start;margin-top:6px;color:var(--yellow);border-radius:12px;padding:5px 10px" id="stash-payday"></span></div>
+  </div>
+  <div class="card thin col" style="gap:8px"><span class="fred" style="font-size:18px" id="stash-mile"></span><div class="goal"><div class="bar" style="height:16px;border:2px solid var(--ink);border-radius:9px"><i id="stash-milebar" style="background:var(--yellow)"></i></div></div><span class="small" id="stash-rate"></span></div>
+  <section class="col"><h2>Where it came from</h2><div class="chips2" id="stash-villas" style="gap:8px"></div></section>
+  <section class="col"><h2>My wins this season</h2><div class="col" id="stash-wins" style="gap:8px"></div><span class="small" id="stash-more"></span></section>
+  <section class="col"><h2>Paydays</h2><div class="paydays" id="stash-paydays"></div><span class="small" style="font-weight:700;color:var(--mute2)">Stay on the team until payday and it's all yours.</span></section>
+</section>
+
+<nav class="nav" id="nav" hidden>
+  <button data-go="home" id="nav-home"><span data-face="nav_home"></span>Home</button>
+  <button class="star" data-sheet aria-label="Upload a review"><span data-face="nav_star"></span></button>
+  <button data-go="stash" id="nav-stash"><span data-face="nav_jar"></span>My stash</button>
+</nav>
+
+<!-- Admin login -->
+<section class="screen" id="s-adminlogin">
+  <button class="link" data-go="welcome" style="text-decoration:none">← Back</button>
+  <h1>Admin login</h1>
+  <form class="card shadow col" id="f-admin" style="gap:18px;padding:22px 18px">
+    <div class="field"><label for="aname">Who are you?</label><select class="select" id="aname"><option>BN Admin</option><option>HoR Admin</option><option>Owner Admin</option></select></div>
+    <div class="field"><label for="apass">Password</label><input class="input" id="apass" type="password" autocomplete="current-password"></div>
+    <div class="err" id="admin-err"></div>
+    <button class="btn" type="submit">Open the admin desk</button>
+  </form>
+</section>
+
+<!-- 5 · Admin desk -->
+<section class="screen admin" id="s-admin" style="gap:14px">
+  <div class="between"><span class="pill" style="color:var(--yellow);font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;border-radius:16px" id="admin-name">Admin</span><button class="link" data-logout style="text-decoration:none;font-size:14px">Log out</button></div>
+  <div class="col" style="gap:4px"><h1>Admin desk</h1><span style="font-size:15px;font-weight:600;color:var(--mute2)"><span id="admin-scope">BN Admin sees Balinest villas, HoR Admin sees Endless Summer, Owner Admin sees all.</span> Staff upload; you decide.</span></div>
+  <div class="row" style="gap:8px;flex-wrap:wrap"><span class="tag" style="background:var(--yellow);border:2.5px solid var(--ink);border-radius:14px;padding:6px 12px;font-size:14px" id="q-count">To confirm · 0</span><select class="select" id="q-villa" style="height:38px;width:auto;font-size:14px;border-radius:14px;background:var(--white)"><option value="">All villas</option></select></div>
+  <div class="col" id="queue" style="gap:12px"></div>
+  <details class="card thin"><summary class="fred" style="cursor:pointer;font-size:18px">Reset a PIN</summary>
+    <div class="col" style="gap:8px;margin-top:8px"><span class="small">Sets the PIN back to 8888. They'll be asked to choose a new one at their next login.</span>
+    <div class="row"><select class="select" id="rp-villa" style="height:44px;font-size:14px"></select><select class="select" id="rp-who" style="height:44px;font-size:14px"></select></div>
+    <button class="abtn pink" id="rp-go">Reset PIN to 8888</button><span class="small" id="rp-msg"></span></div></details>
+  <details class="card thin"><summary class="fred" style="cursor:pointer;font-size:18px">Review goals (numbers on Home)</summary>
+    <div class="col" style="gap:8px;margin-top:8px"><span class="small">Type each channel's current review count and score from the listing page. Staff see these on Home.</span>
+    <select class="select" id="g-villa" style="height:44px;font-size:14px"></select>
+    <div class="col" id="g-rows" style="gap:6px"></div></div></details>
+  <details class="card thin"><summary class="fred" style="cursor:pointer;font-size:18px">Recently confirmed &amp; audit</summary><div class="col" id="audit" style="gap:6px;margin-top:8px;font-size:13px"></div>
+    <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><a class="abtn light" style="display:flex;align-items:center;justify-content:center;text-decoration:none;flex:0 0 auto" id="export" href="#">Download payout lines (CSV)</a><button class="abtn light" id="reset-test" style="flex:0 0 auto;display:none">Reset test data</button></div><span class="small" id="reset-msg"></span></details>
+  <span class="small">Confirmed grades are locked; a correction goes in as a new entry. Every confirm and reset is logged with the admin's name.</span>
+</section>
+<script>
+const FACES = {"star_big": "<svg width=\"130\" height=\"130\" viewBox=\"0 0 100 100\" aria-hidden=\"true\"><path d=\"M50 6 L62 36 L94 38 L69 58 L78 90 L50 72 L22 90 L31 58 L6 38 L38 36 Z\" fill=\"#FFD84D\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linejoin=\"round\"></path><ellipse class=\"blink\" cx=\"41\" cy=\"50\" rx=\"3.6\" ry=\"5.4\" fill=\"#2B2140\"></ellipse><ellipse class=\"blink\" cx=\"59\" cy=\"50\" rx=\"3.6\" ry=\"5.4\" fill=\"#2B2140\"></ellipse><path d=\"M43 60 Q50 67 57 60\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path><circle cx=\"33\" cy=\"60\" r=\"4\" fill=\"#FF7EB3\" opacity=\".8\"></circle><circle cx=\"67\" cy=\"60\" r=\"4\" fill=\"#FF7EB3\" opacity=\".8\"></circle></svg>", "smiley": "<svg width=\"86\" height=\"86\" viewBox=\"0 0 100 100\" aria-hidden=\"true\"><circle cx=\"50\" cy=\"50\" r=\"42\" fill=\"#FFD84D\" stroke=\"#2B2140\" stroke-width=\"4\"></circle><ellipse class=\"blink\" cx=\"40\" cy=\"47\" rx=\"3.6\" ry=\"5.4\" fill=\"#2B2140\"></ellipse><ellipse class=\"blink\" cx=\"60\" cy=\"47\" rx=\"3.6\" ry=\"5.4\" fill=\"#2B2140\"></ellipse><path d=\"M41 60 Q50 68 59 60\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path><circle cx=\"31\" cy=\"58\" r=\"4\" fill=\"#FF7EB3\" opacity=\".8\"></circle><circle cx=\"69\" cy=\"58\" r=\"4\" fill=\"#FF7EB3\" opacity=\".8\"></circle></svg>", "heart": "<svg width=\"92\" height=\"92\" viewBox=\"0 0 100 100\" aria-hidden=\"true\"><path d=\"M50 88 C20 66 8 50 8 32 C8 18 19 8 32 8 C40 8 46 12 50 18 C54 12 60 8 68 8 C81 8 92 18 92 32 C92 50 80 66 50 88 Z\" fill=\"#FF7EB3\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linejoin=\"round\"></path><ellipse class=\"blink\" cx=\"38\" cy=\"38\" rx=\"3.6\" ry=\"5.4\" fill=\"#2B2140\"></ellipse><ellipse class=\"blink\" cx=\"62\" cy=\"38\" rx=\"3.6\" ry=\"5.4\" fill=\"#2B2140\"></ellipse><path d=\"M41 50 Q50 58 59 50\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path></svg>", "sparkle": "<svg class=\"tw\" style=\"position: absolute; left: 34px; top: 28px\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 1 L14 10 L23 12 L14 14 L12 23 L10 14 L1 12 L10 10 Z\" fill=\"#FFF8EE\"></path></svg>", "star_small": "<svg width=\"30\" height=\"30\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z\" fill=\"#FFD84D\" stroke=\"#2B2140\" stroke-width=\"1.6\" stroke-linejoin=\"round\"></path></svg>", "upload": "<svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#FFD84D\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 16V4\"></path><path d=\"M6 10l6-6 6 6\"></path><path d=\"M4 20h16\"></path></svg>", "jar_small": "<svg width=\"58\" height=\"64\" viewBox=\"0 0 120 130\" aria-hidden=\"true\"><rect x=\"28\" y=\"6\" width=\"64\" height=\"18\" rx=\"7\" fill=\"#BFA8FF\" stroke=\"#2B2140\" stroke-width=\"4\"></rect><path d=\"M24 30 Q24 24 30 24 L90 24 Q96 24 96 30 L100 110 Q100 124 86 124 L34 124 Q20 124 20 110 Z\" fill=\"#FFF8EE\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linejoin=\"round\"></path><circle cx=\"44\" cy=\"102\" r=\"12\" fill=\"#FFD84D\" stroke=\"#2B2140\" stroke-width=\"3\"></circle><circle cx=\"72\" cy=\"104\" r=\"12\" fill=\"#FFD84D\" stroke=\"#2B2140\" stroke-width=\"3\"></circle><circle cx=\"58\" cy=\"87\" r=\"12\" fill=\"#FFD84D\" stroke=\"#2B2140\" stroke-width=\"3\"></circle><ellipse class=\"blink\" cx=\"48\" cy=\"55\" rx=\"4\" ry=\"5.5\" fill=\"#2B2140\"></ellipse><ellipse class=\"blink\" cx=\"72\" cy=\"55\" rx=\"4\" ry=\"5.5\" fill=\"#2B2140\"></ellipse><path d=\"M51 66 Q60 73 69 66\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path></svg>", "nav_home": "<svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.3\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 10l9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"></path></svg>", "nav_star": "<svg width=\"28\" height=\"28\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z\" fill=\"#2B2140\"></path></svg>", "nav_jar": "<svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.3\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"6\" y=\"2\" width=\"12\" height=\"4\" rx=\"1\"></rect><path d=\"M5 8h14l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z\"></path></svg>", "star_tiny": "<svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\"><path d=\"M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z\" fill=\"#FFD84D\"></path></svg>", "image": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"4\"></rect><circle cx=\"9\" cy=\"9\" r=\"2\"></circle><path d=\"M21 15l-5-5L5 21\"></path></svg>", "jar_big": "<svg width=\"104\" height=\"112\" viewBox=\"0 0 120 130\" aria-hidden=\"true\" style=\"flex-shrink: 0\"><rect x=\"28\" y=\"6\" width=\"64\" height=\"18\" rx=\"6\" fill=\"#BFA8FF\" stroke=\"#2B2140\" stroke-width=\"4\"></rect><path d=\"M24 30 Q24 24 30 24 L90 24 Q96 24 96 30 L100 110 Q100 124 86 124 L34 124 Q20 124 20 110 Z\" fill=\"#FFF8EE\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linejoin=\"round\"></path><g class=\"bob\"><circle cx=\"44\" cy=\"102\" r=\"12\" fill=\"#FFD84D\" stroke=\"#2B2140\" stroke-width=\"3\"></circle></g><g class=\"bob2\"><circle cx=\"72\" cy=\"104\" r=\"12\" fill=\"#FFD84D\" stroke=\"#2B2140\" stroke-width=\"3\"></circle></g><g class=\"bob3\"><circle cx=\"58\" cy=\"86\" r=\"12\" fill=\"#FFD84D\" stroke=\"#2B2140\" stroke-width=\"3\"></circle></g><ellipse class=\"blink\" cx=\"48\" cy=\"54\" rx=\"4\" ry=\"6\" fill=\"#2B2140\"></ellipse><ellipse class=\"blink\" cx=\"72\" cy=\"54\" rx=\"4\" ry=\"6\" fill=\"#2B2140\"></ellipse><path d=\"M50 65 Q60 74 70 65\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path><circle cx=\"40\" cy=\"64\" r=\"4\" fill=\"#FF7EB3\"></circle><circle cx=\"80\" cy=\"64\" r=\"4\" fill=\"#FF7EB3\"></circle></svg>", "star_mile": "<svg width=\"30\" height=\"30\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 1 L14.2 9.8 L23 12 L14.2 14.2 L12 23 L9.8 14.2 L1 12 L9.8 9.8 Z\" fill=\"#2B2140\"></path></svg>", "dancer": "<svg width=\"150\" height=\"160\" viewBox=\"0 0 150 160\" aria-hidden=\"true\"> <g class=\"armL\"><path d=\"M44 66 L16 40\" stroke=\"#2B2140\" stroke-width=\"5\" stroke-linecap=\"round\"></path><circle cx=\"14\" cy=\"38\" r=\"7\" fill=\"#FFD84D\" stroke=\"#2B2140\" stroke-width=\"4\"></circle></g> <g class=\"armR\"><path d=\"M106 66 L134 40\" stroke=\"#2B2140\" stroke-width=\"5\" stroke-linecap=\"round\"></path><circle cx=\"136\" cy=\"38\" r=\"7\" fill=\"#FFD84D\" stroke=\"#2B2140\" stroke-width=\"4\"></circle></g> <g class=\"kickL\"><path d=\"M62 112 L54 146\" stroke=\"#2B2140\" stroke-width=\"5\" stroke-linecap=\"round\"></path><ellipse cx=\"50\" cy=\"148\" rx=\"9\" ry=\"5\" fill=\"#2B2140\"></ellipse></g> <g class=\"kickR\"><path d=\"M88 112 L96 146\" stroke=\"#2B2140\" stroke-width=\"5\" stroke-linecap=\"round\"></path><ellipse cx=\"100\" cy=\"148\" rx=\"9\" ry=\"5\" fill=\"#2B2140\"></ellipse></g> <path d=\"M75 10 L89 45 L126 47 L97 71 L107 108 L75 87 L43 108 L53 71 L24 47 L61 45 Z\" fill=\"#FFD84D\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linejoin=\"round\"></path> <path d=\"M62 60 Q67 54 72 60\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path> <path d=\"M78 60 Q83 54 88 60\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path> <path d=\"M65 70 Q75 83 85 70 Z\" fill=\"#2B2140\"></path> <circle cx=\"56\" cy=\"72\" r=\"4.5\" fill=\"#FF7EB3\"></circle><circle cx=\"94\" cy=\"72\" r=\"4.5\" fill=\"#FF7EB3\"></circle> </svg>", "hands": "<svg width=\"72\" height=\"56\" viewBox=\"0 0 72 56\" aria-hidden=\"true\"> <g class=\"burst\"><path d=\"M36 4 L36 12 M24 8 L28 14 M48 8 L44 14\" stroke=\"#FFD84D\" stroke-width=\"3\" stroke-linecap=\"round\"></path></g> <g class=\"clapL\"><rect x=\"8\" y=\"22\" width=\"22\" height=\"26\" rx=\"9\" fill=\"#FF7EB3\" stroke=\"#2B2140\" stroke-width=\"2.5\"></rect><rect x=\"10\" y=\"12\" width=\"5\" height=\"14\" rx=\"2.5\" fill=\"#FF7EB3\" stroke=\"#2B2140\" stroke-width=\"2.2\"></rect><rect x=\"16\" y=\"9\" width=\"5\" height=\"16\" rx=\"2.5\" fill=\"#FF7EB3\" stroke=\"#2B2140\" stroke-width=\"2.2\"></rect><rect x=\"22\" y=\"11\" width=\"5\" height=\"15\" rx=\"2.5\" fill=\"#FF7EB3\" stroke=\"#2B2140\" stroke-width=\"2.2\"></rect></g> <g class=\"clapR\"><rect x=\"42\" y=\"22\" width=\"22\" height=\"26\" rx=\"9\" fill=\"#E7C29A\" stroke=\"#2B2140\" stroke-width=\"2.5\"></rect><rect x=\"45\" y=\"11\" width=\"5\" height=\"15\" rx=\"2.5\" fill=\"#E7C29A\" stroke=\"#2B2140\" stroke-width=\"2.2\"></rect><rect x=\"51\" y=\"9\" width=\"5\" height=\"16\" rx=\"2.5\" fill=\"#E7C29A\" stroke=\"#2B2140\" stroke-width=\"2.2\"></rect><rect x=\"57\" y=\"12\" width=\"5\" height=\"14\" rx=\"2.5\" fill=\"#E7C29A\" stroke=\"#2B2140\" stroke-width=\"2.2\"></rect></g> </svg>", "cloud": "<svg width=\"170\" height=\"128\" viewBox=\"0 0 170 128\" aria-hidden=\"true\"> <path d=\"M40 110 Q12 110 12 84 Q12 60 38 58 Q40 26 74 24 Q102 22 110 48 Q142 42 152 70 Q160 110 126 110 Z\" fill=\"#BFA8FF\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linejoin=\"round\"></path> <ellipse class=\"blink\" cx=\"70\" cy=\"70\" rx=\"3.6\" ry=\"5.4\" fill=\"#2B2140\"></ellipse><ellipse class=\"blink\" cx=\"98\" cy=\"70\" rx=\"3.6\" ry=\"5.4\" fill=\"#2B2140\"></ellipse> <path d=\"M76 82 Q84 88 92 82\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path> <circle cx=\"60\" cy=\"81\" r=\"4.5\" fill=\"#FF7EB3\" opacity=\".8\"></circle><circle cx=\"108\" cy=\"81\" r=\"4.5\" fill=\"#FF7EB3\" opacity=\".8\"></circle> <path d=\"M34 92 Q60 118 84 104\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path> <path d=\"M134 92 Q108 118 86 104\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path> <path class=\"beat\" d=\"M85 112 C77 106 73 102 73 97 C73 94 75 92 78 92 C80 92 83 93 85 96 C87 93 90 92 92 92 C95 92 97 94 97 97 C97 102 93 106 85 112 Z\" fill=\"#FF7EB3\" stroke=\"#2B2140\" stroke-width=\"2\"></path> </svg>", "cup": "<svg width=\"150\" height=\"130\" viewBox=\"0 0 150 130\" aria-hidden=\"true\"> <path class=\"steam\" d=\"M62 22 Q56 14 62 6\" fill=\"none\" stroke=\"#6B5E7B\" stroke-width=\"4\" stroke-linecap=\"round\"></path> <path class=\"steam2\" d=\"M80 22 Q74 14 80 6\" fill=\"none\" stroke=\"#6B5E7B\" stroke-width=\"4\" stroke-linecap=\"round\"></path> <path d=\"M30 34 L120 34 L112 104 Q110 118 96 118 L54 118 Q40 118 38 104 Z\" fill=\"#7FE0B8\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linejoin=\"round\"></path> <path d=\"M118 48 Q140 50 136 70 Q132 86 114 84\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path> <path d=\"M58 70 Q63 75 68 70\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path> <path d=\"M82 70 Q87 75 92 70\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path> <path d=\"M68 86 Q75 91 82 86\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path> <circle cx=\"52\" cy=\"82\" r=\"4.5\" fill=\"#FF7EB3\" opacity=\".7\"></circle><circle cx=\"98\" cy=\"82\" r=\"4.5\" fill=\"#FF7EB3\" opacity=\".7\"></circle> </svg>", "star_signin": "<svg width=\"78\" height=\"78\" viewBox=\"0 0 100 100\" aria-hidden=\"true\"><path d=\"M50 6 L62 36 L94 38 L69 58 L78 90 L50 72 L22 90 L31 58 L6 38 L38 36 Z\" fill=\"#FFD84D\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linejoin=\"round\"></path><ellipse class=\"blink\" cx=\"41\" cy=\"50\" rx=\"3.6\" ry=\"5.4\" fill=\"#2B2140\"></ellipse><ellipse class=\"blink\" cx=\"59\" cy=\"50\" rx=\"3.6\" ry=\"5.4\" fill=\"#2B2140\"></ellipse><path d=\"M43 60 Q50 67 57 60\" fill=\"none\" stroke=\"#2B2140\" stroke-width=\"4\" stroke-linecap=\"round\"></path></svg>"};
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const rp = (n) => "Rp " + Math.round(Number(n) || 0).toLocaleString("id-ID");
+const rb = (n) => { n = Math.round(Number(n) || 0); return n >= 1e6 ? (n / 1e6).toFixed(n % 1e6 ? 1 : 0).replace(".", ",") + "jt" : Math.round(n / 1000) + "rb"; };
+const CH = { "Airbnb": "#FF5A5F", "Booking.com": "#003580", "Trip.com": "#287DFA", "Google": "#34A853" };
+const GOALS = { "Airbnb": { n: 15, score: 4.85, max: 5 }, "Booking.com": { n: 15, score: 9.5, max: 10 }, "Trip.com": { n: 15, score: 9.5, max: 10 }, "Google": { n: 50, score: 4.9, max: 5 } };
+const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { return null; } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const fmtDate = (s) => { if (!s) return ""; const d = new Date(s); return isNaN(d) ? String(s) : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }); };
+const dot = (ch) => `<i class="dot" style="background:${CH[ch] || "#999"}"></i>`;
+
+// faces
+$$("[data-face]").forEach((el) => { el.innerHTML = FACES[el.dataset.face] || ""; });
+$$("[data-stars5]").forEach((el) => { el.innerHTML = [1, 2, 3, 4, 5].map((i) => FACES.star_small.replace("<svg", `<svg class="s${i}"`)).join(""); });
+$$(".yr").forEach((el) => (el.textContent = new Date().getFullYear()));
+
+// ---------- state & api ----------
+let villas = [], operators = [], roles = [], me = null, session = store("rg-session") || "", kind = store("rg-kind") || "";
+const api = async (path, opts = {}) => {
+  const r = await fetch(path, { ...opts, headers: { "content-type": "application/json", "x-session": session, ...(opts.headers || {}) } });
+  const d = await r.json().catch(() => ({ error: "The site didn't answer properly. Try again." }));
+  if (r.status === 401 && d.error === "signin") { logout(); throw new Error("Please log in again."); }
+  if (!r.ok) throw new Error(d.error || d.message || "Something went wrong. Try again.");
+  return d;
+};
+function show(id) {
+  $$(".screen").forEach((s) => s.classList.toggle("on", s.id === "s-" + id));
+  $("#nav").hidden = !["home", "stash"].includes(id);
+  $("#nav-home").classList.toggle("on", id === "home"); $("#nav-stash").classList.toggle("on", id === "stash");
+  window.scrollTo(0, 0);
+}
+function logout() { session = ""; kind = ""; me = null; store("rg-session", null); store("rg-kind", null); show("welcome"); }
+$$("[data-go]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); if (b.dataset.first) { $("#signin-title").textContent = "Set up my PIN"; $("#signin-sub").textContent = "Your starting PIN is 8888. You'll choose your own next."; $("#pin-label").textContent = "Starting PIN (8888)"; } else if (b.dataset.go === "signin") { $("#signin-title").textContent = "Welcome back"; $("#signin-sub").textContent = "Good to see you. Let's check in."; $("#pin-label").textContent = "Your 4-digit PIN"; } go(b.dataset.go); }));
+$$("[data-logout]").forEach((b) => b.addEventListener("click", logout));
+async function go(id) {
+  if (id === "home") await loadHome();
+  if (id === "stash") await loadStash();
+  if (id === "admin") await loadAdmin();
+  show(id);
+}
+
+// ---------- villas & sign in ----------
+async function loadVillas() {
+  const d = await api("/api/villas");
+  villas = d.villas; operators = d.operators || []; roles = d.roles || [];
+  const opts = villas.map((v) => `<option value="${esc(v.key)}">${esc(v.name)}</option>`).join("");
+  $("#company").innerHTML = '<option value="">Choose your company</option>' + operators.map((o) => `<option value="${esc(o.key)}">${esc(o.name)}</option>`).join("");
+  $("#villa").innerHTML = '<option value="">Choose your villa</option>' + opts;
+  $("#q-villa").innerHTML = '<option value="">All villas</option>' + opts;
+  $("#rp-villa").innerHTML = opts; $("#g-villa").innerHTML = opts;
+}
+const ROLE_LABEL = { host: "Host", supervisor: "Supervisor", housekeeper: "Housekeeper", pool: "Pool", garden: "Garden", security: "Security" };
+// Sign in: company → villa → designation → name → PIN
+$("#company").addEventListener("change", () => {
+  const op = $("#company").value;
+  $("#villa").innerHTML = '<option value="">Choose your villa</option>' + villas.filter((v) => v.operator === op).map((v) => `<option value="${esc(v.key)}">${esc(v.name)}</option>`).join("");
+  $("#step-villa").hidden = !op; $("#step-role").hidden = true; $("#signin-more").hidden = true;
+});
+$("#villa").addEventListener("change", () => {
+  const v = villas.find((x) => x.key === $("#villa").value);
+  const present = v ? roles.filter((r) => v.staff.some((s) => s.role === r)) : [];
+  $("#role").innerHTML = '<option value="">Choose your designation</option>' + present.map((r) => `<option value="${esc(r)}">${esc(ROLE_LABEL[r] || r)}</option>`).join("");
+  $("#step-role").hidden = !v; $("#signin-more").hidden = true;
+});
+$("#role").addEventListener("change", () => {
+  const v = villas.find((x) => x.key === $("#villa").value), role = $("#role").value;
+  const people = v && role ? v.staff.filter((s) => s.role === role) : [];
+  $("#who").innerHTML = '<option value="">Choose your name</option>' + people.map((s) => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join("");
+  $("#signin-more").hidden = !people.length;
+});
+$("#f-signin").addEventListener("submit", async (e) => {
+  e.preventDefault(); $("#signin-err").textContent = "";
+  try {
+    const d = await api("/api/auth/staff", { method: "POST", body: JSON.stringify({ operator: $("#company").value, villa: $("#villa").value, role: $("#role").value, staff_id: $("#who").value, pin: $("#pin").value }) });
+    session = d.token; kind = "staff"; store("rg-session", session); store("rg-kind", kind); me = d.me; $("#pin").value = "";
+    if (d.must_change_pin) show("newpin"); else go("home");
+  } catch (err) { $("#signin-err").textContent = err.message; }
+});
+$("#f-newpin").addEventListener("submit", async (e) => {
+  e.preventDefault(); $("#newpin-err").textContent = "";
+  if ($("#pin1").value !== $("#pin2").value) { $("#newpin-err").textContent = "The two PINs don't match."; return; }
+  try { await api("/api/auth/staff/pin", { method: "POST", body: JSON.stringify({ new_pin: $("#pin1").value }) }); $("#pin1").value = $("#pin2").value = ""; go("home"); }
+  catch (err) { $("#newpin-err").textContent = err.message; }
+});
+$("#f-admin").addEventListener("submit", async (e) => {
+  e.preventDefault(); $("#admin-err").textContent = "";
+  try { const d = await api("/api/auth/admin", { method: "POST", body: JSON.stringify({ name: $("#aname").value, password: $("#apass").value }) }); session = d.token; kind = "admin"; store("rg-session", session); store("rg-kind", kind); $("#apass").value = ""; go("admin"); }
+  catch (err) { $("#admin-err").textContent = err.message; }
+});
+
+// ---------- home ----------
+let homeData = null, goalVilla = "";
+async function loadHome() {
+  homeData = await api("/api/me");
+  me = homeData.me;
+  if (homeData.must_change_pin) { show("newpin"); throw new Error("pin"); }
+  const roleName = me.role.charAt(0).toUpperCase() + me.role.slice(1);
+  $("#home-role").textContent = `${roleName} · ${me.villas.length} villa${me.villas.length === 1 ? "" : "s"}`;
+  $("#home-hi").textContent = `Hi, ${me.name}`;
+  const st = homeData.stash;
+  $("#home-stash-label").textContent = me.villas.length > 1 ? `My stash · all ${me.villas.length} villas` : "My stash";
+  $("#home-stash").textContent = rp(st.total);
+  $("#home-payday").textContent = `Payday ${st.payday.label} · ${st.payday.days} day${st.payday.days === 1 ? "" : "s"} to go`;
+  $("#home-villas").innerHTML = me.villas.map((v) => { const b = st.by_villa.find((x) => x.villa === v); return `<span><span>${esc(v)}</span><span>${rb(b ? b.amount : 0)}</span></span>`; }).join("");
+  goalVilla = me.villas.includes(goalVilla) ? goalVilla : me.villas[0];
+  renderGoals();
+  $("#upvilla").innerHTML = me.villas.map((v) => `<option value="${esc(v)}">${esc(villas.find((x) => x.key === v)?.name || v)}</option>`).join("");
+}
+function renderGoals() {
+  $("#goal-tabs").innerHTML = me.villas.map((v) => `<button role="tab" class="${v === goalVilla ? "on" : ""}" data-v="${esc(v)}">${esc(v)}</button>`).join("");
+  $$("#goal-tabs button").forEach((b) => (b.onclick = () => { goalVilla = b.dataset.v; renderGoals(); }));
+  const g = (homeData.goals || {})[goalVilla] || {};
+  const shared = ["Kapuk", "Palem", "Jati"].includes(goalVilla);
+  $("#goal-rows").innerHTML = Object.keys(GOALS).map((ch) => {
+    const t = GOALS[ch], cur = g[ch] || {};
+    const count = cur.count || 0, score = cur.score;
+    const pct = Math.min(100, Math.round((count / t.n) * 100));
+    const toGo = Math.max(0, t.n - count);
+    const status = !cur.updated ? "Numbers not entered yet" : score != null && score < t.score ? "score needs a lift" : toGo ? `${toGo} to go` : "goal reached";
+    return `<div class="goal"><div class="between" style="font-size:14px;font-weight:800"><span>${dot(ch)}${esc(ch)}${shared && ch === "Google" ? " (Oasis)" : ""}</span><span>${count} / ${t.n} reviews${score != null ? ` · score ${score}` : ""}</span></div><div class="bar"><i style="width:${pct}%;background:${CH[ch]}"></i></div><span class="g">Goal ${t.n} at ${t.score}+ · ${status}${shared && ch === "Google" ? " · shared by 3 Oasis villas" : ""}</span></div>`;
+  }).join("");
+}
+
+// ---------- upload sheet ----------
+let pending = [];
+function openSheet() { if (kind !== "staff") return; $("#sheetbg").classList.add("on"); $("#sheet").classList.add("on"); $("#up-err").textContent = ""; }
+function closeSheet() { $("#sheetbg").classList.remove("on"); $("#sheet").classList.remove("on"); }
+$$("[data-sheet]").forEach((b) => b.addEventListener("click", openSheet));
+$("#sheetbg").addEventListener("click", closeSheet); $("#sheet-close").addEventListener("click", closeSheet);
+const drop = $("#drop"), file = $("#file");
+drop.addEventListener("click", () => file.click());
+drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); } });
+file.addEventListener("change", () => { takeFiles(file.files); file.value = ""; });
+["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => e.preventDefault()));
+drop.addEventListener("drop", (e) => { e.preventDefault(); takeFiles(e.dataTransfer.files); });
+document.addEventListener("paste", (e) => { if (kind !== "staff") return; const fs = [...(e.clipboardData?.items || [])].filter((i) => i.kind === "file" && /^image\//.test(i.type)).map((i) => i.getAsFile()).filter(Boolean); if (fs.length) { openSheet(); takeFiles(fs); } });
+function takeFiles(list) {
+  const fs = [...list].filter((f) => /^image\//.test(f.type));
+  if (!fs.length) return;
+  pending = pending.concat(fs).slice(0, 5);
+  $("#thumbs").innerHTML = ""; pending.forEach((f) => { const img = new Image(); img.src = URL.createObjectURL(f); img.alt = ""; $("#thumbs").append(img); });
+  $("#up-go").disabled = false; $("#up-go").textContent = pending.length > 1 ? `Grade ${pending.length} screenshots` : "Grade it";
+  $("#drop b").textContent = pending.length >= 5 ? "That's the maximum (5)" : "Add another screenshot";
+}
+async function shrink(f) {
+  const bmp = await createImageBitmap(f);
+  const sc = Math.min(1, 1568 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas"); c.width = Math.round(bmp.width * sc); c.height = Math.round(bmp.height * sc);
+  const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height);
+  const url = c.toDataURL("image/jpeg", 0.85); return { media_type: "image/jpeg", data: url.slice(url.indexOf(",") + 1) };
+}
+const STEPS = ["Uploading…", "Reading the screenshot…", "Finding the guest's words…", "Checking for complaints…", "Looking for who they named…", "Working out the grade…", "Saving it safely…"];
+let ovTimer = null;
+function overlayOn() { $("#overlay").classList.add("on"); document.body.style.overflow = "hidden"; const t0 = Date.now(); clearInterval(ovTimer); const tick = () => { const s = Math.round((Date.now() - t0) / 1000); $("#ov-timer").textContent = s + " s"; $("#ov-step").textContent = STEPS[Math.min(STEPS.length - 1, Math.floor(s / 5))]; $("#ov-prog").style.width = Math.min(92, 100 * (1 - Math.exp(-s / 18))) + "%"; }; tick(); ovTimer = setInterval(tick, 1000); }
+function overlayOff() { clearInterval(ovTimer); $("#overlay").classList.remove("on"); document.body.style.overflow = ""; $("#ov-prog").style.width = "0"; }
+$("#up-go").addEventListener("click", async () => {
+  if (!pending.length) return;
+  $("#up-err").textContent = "";
+  const villa = $("#upvilla").value; const fs = pending;
+  closeSheet(); overlayOn();
+  try {
+    const images = await Promise.all(fs.map(shrink));
+    const d = await api("/api/reviews", { method: "POST", body: JSON.stringify({ villa, images }) });
+    store("rg-job", d.job);
+    const job = await waitJob(d.job);
+    store("rg-job", null);
+    pending = []; $("#thumbs").innerHTML = ""; $("#up-go").disabled = true; $("#drop b").textContent = "Choose the screenshot";
+    showResult(job);
+  } catch (err) { overlayOff(); openSheet(); $("#up-err").textContent = err.message; }
+});
+async function waitJob(id) {
+  for (let i = 0; i < 150; i++) {
+    await sleep(i < 5 ? 2500 : 3000);
+    let d; try { d = await api("/api/job?id=" + encodeURIComponent(id)); } catch (e) { if (/log in/.test(e.message)) throw e; continue; }
+    if (d.status !== "working") return d;
+  }
+  throw new Error("This is taking too long. Check your stash in a few minutes.");
+}
+async function resumeJob() { const id = store("rg-job"); if (!id || kind !== "staff") return; overlayOn(); try { const job = await waitJob(id); store("rg-job", null); showResult(job); } catch { overlayOff(); store("rg-job", null); } }
+
+// ---------- result ----------
+function showResult(job) {
+  overlayOff();
+  if (job.status === "error") { show("home"); alertBox(job.error); return; }
+  const rs = job.reviews || [];
+  $("#confetti").innerHTML = ""; $("#r-more").innerHTML = ""; $("#r-second").style.display = "none";
+  if (!rs.length) {
+    $("#r-top").innerHTML = `<span class="breathe" data-face="cup"></span><span style="font-size:13px;font-weight:800;letter-spacing:.6px;color:var(--purple)">HMM</span><h1 style="font-size:28px;text-align:center">We couldn't find a review in that</h1><p style="margin:0;text-align:center;color:var(--mute2);font-weight:600">${esc((job.notes || []).concat(job.errors || []).join(" · ") || "Make sure the screenshot shows the guest's name, the stars and their words.")}</p>`;
+    $("#r-top [data-face]").innerHTML = FACES.cup; $("#r-body").innerHTML = ""; show("result"); return;
+  }
+  const r = rs[0];
+  const stash = homeData ? homeData.stash : null;
+  const when = fmtDate(r.date_iso) || r.date || "";
+  const where = `${dot(r.platform)}${esc(r.platform)} · ${esc(villas.find((v) => v.key === r.villa)?.name || r.villa)}${when ? " · " + esc(when) : ""}`;
+  if (r.duplicate_of) {
+    $("#r-top").innerHTML = `<span class="breathe" data-face="cloud"></span><span style="font-size:13px;font-weight:800;letter-spacing:.6px;color:var(--purple)">ALREADY IN</span><h1 style="font-size:28px;text-align:center">This one's already been uploaded</h1><p style="margin:0;text-align:center;color:var(--mute2);font-weight:600">${where}</p>`;
+    $("#r-top [data-face]").innerHTML = FACES.cloud;
+    $("#r-body").innerHTML = `<div class="card col" style="gap:10px"><span class="fred" style="font-size:18px">It was graded ${esc(r.duplicate_of.grade || "")} on ${esc(String(r.duplicate_of.date || "").slice(0, 10))}</span><span style="font-size:15px">A review only counts once, so nothing changes in your stash. If a different guest wrote something similar, ask an admin.</span></div>`;
+  } else if (r.grade === "A") {
+    const colors = ["#FFD84D", "#BFA8FF", "#FF7EB3"];
+    $("#confetti").innerHTML = Array.from({ length: 12 }, (_, i) => `<i class="confetti" style="left:${6 + i * 8}%;background:${colors[i % 3]};animation-delay:${(i * 0.37) % 3.5}s;border-radius:${i % 2 ? "5px" : "3px"}"></i>`).join("");
+    $("#r-top").innerHTML = `<span class="dance">${FACES.dancer}</span><div class="row" style="gap:3px">${[1, 2, 3, 4, 5].map(() => FACES.star_tiny).join("")}</div><h1 class="pop" style="font-size:38px;line-height:1.05;text-align:center;margin-top:4px">It's a Grade A review!</h1><p style="margin:0;font-size:15px;font-weight:700;color:var(--mute2);text-align:center">${where}</p>`;
+    $("#r-body").innerHTML = `
+      <div class="row card" style="gap:12px;padding:12px 16px;border-radius:22px">${FACES.hands}<span class="fred" style="font-size:22px">High five!</span></div>
+      <div class="pay pop" style="animation-delay:.15s"><b>Into Team ${esc(r.villa)}'s pot</b><span class="amt">+${rp(r.pot)}</span></div>
+      <div class="pay yellow pop" style="animation-delay:.3s"><b>Your share, into your stash</b><span class="amt">+${rp(r.share_estimate)}</span></div>
+      ${(r.staff_named || []).length ? `<div class="note" style="background:var(--lilac)"><strong>The guest named ${esc(r.staff_named.map((s) => s.name).join(" and "))}.</strong> If that's you, an admin adds ${rp(stash ? stash.name_bonus : 200000)} on top.</div>` : ""}
+      <div class="card col pop" style="gap:8px;border-radius:22px;animation-delay:.45s"><span style="font-size:13px;font-weight:800;letter-spacing:.6px;color:var(--purple)">A NOTE FROM THE OWNER</span><span style="font-size:17px;font-weight:600;line-height:1.45">${esc(r.owner_note)}</span><span style="font-family:'Caveat',cursive;font-size:26px;font-weight:600;color:var(--purple)">Jayne, PT Azure</span></div>
+      <span style="font-size:14px;font-weight:700;color:var(--mute2);text-align:center">An admin will give it a quick look, then it's locked into your stash.</span>`;
+  } else if (r.grade === "B") {
+    const cav = (r.complaints || [])[0];
+    const reason = cav ? cav.quote : (r.intensity || 0) < 4 ? (r.intensity_quote || r.summary) : r.summary;
+    const tip = cav ? `One small "but" is all it takes. Fix ${esc(cav.issue || "that")}, and the next guest's review could be your A.` : (r.intensity || 0) < 4 ? "The guest was happy, but not over the moon. The A's come when a guest remembers one moment you made for them." : "The praise was general. When a guest can name one thing you did, that's the A.";
+    $("#r-top").innerHTML = `<span class="breathe">${FACES.cloud}</span><span style="font-size:13px;font-weight:800;letter-spacing:.6px;color:var(--purple)">A BIG HUG FOR THIS ONE</span><h1 style="font-size:28px;text-align:center;text-wrap:balance">So close. This one's a B.</h1><p style="margin:0;font-size:16px;font-weight:600;color:var(--mute2);text-align:center">Full stars and a happy guest is still a good day for the villa. It just doesn't pay out this time.</p><p style="margin:0;font-size:14px;font-weight:700;color:var(--mute2);text-align:center">${where}</p>`;
+    $("#r-body").innerHTML = `<div class="card col" style="gap:10px;border-radius:24px"><span class="fred" style="font-size:18px">What kept it from an A</span><div class="quote">"${esc(reason)}"</div><span style="font-size:15px">${tip}</span></div>
+      <div class="card thin" style="background:var(--mint);border-radius:22px;font-size:15px"><strong>Your stash is safe and sound:</strong> ${stash ? `${rp(stash.total)}, waiting for payday on ${esc(stash.payday.label)}.` : "waiting for payday."}</div>`;
+    $("#r-second").style.display = "";
+  } else {
+    const comp = (r.complaints || []).find((c) => c.severity === "complaint") || (r.complaints || [])[0];
+    $("#r-top").innerHTML = `<span class="breathe">${FACES.cup}</span><span style="font-size:13px;font-weight:800;letter-spacing:.6px;color:var(--purple)">TAKE A BREATH</span><h1 style="font-size:28px;text-align:center;text-wrap:balance">This one was tough. It's a C.</h1><p style="margin:0;font-size:16px;font-weight:600;color:var(--mute2);text-align:center">A guest wasn't happy with something. It happens to the best teams, and it's never on one person alone.</p><p style="margin:0;font-size:14px;font-weight:700;color:var(--mute2);text-align:center">${where}</p>`;
+    $("#r-body").innerHTML = `<div class="card col" style="gap:10px;border-radius:24px"><span class="fred" style="font-size:18px">What the guest felt</span><div class="quote">"${esc(comp ? comp.quote : r.summary)}"</div><span style="font-size:15px">Your host has been told. The fix goes on the Monday board, and we sort it out together.</span></div>
+      <div class="card thin" style="background:var(--mint);border-radius:22px;font-size:15px"><strong>Nothing is ever taken from your stash.</strong> ${stash ? `${rp(stash.total)} is still yours on ${esc(stash.payday.label)}.` : ""}</div>
+      <div class="note">Tomorrow's guest is a fresh start. You've got this.</div>`;
+  }
+  if (rs.length > 1) $("#r-more").innerHTML = `<h2 style="font-size:18px">Also in this upload</h2>` + rs.slice(1).map((x) => `<div class="win${x.duplicate_of ? " pending" : ""}"><span class="g">${esc(x.duplicate_of ? "=" : x.grade)}</span><span class="t">${dot(x.platform)}${esc(x.guest || "Guest")} · ${esc(x.villa)}<small>${x.duplicate_of ? "Already uploaded before" : x.grade === "A" ? "Waiting for an admin's look" : x.grade === "B" ? "A B: no payout this time" : "A C: nothing is deducted"}</small></span></div>`).join("");
+  const notes = (job.notes || []).concat(job.errors || []);
+  if (notes.length) $("#r-more").insertAdjacentHTML("beforeend", `<div class="small">${esc(notes.join(" · "))}</div>`);
+  show("result");
+}
+function alertBox(msg) { const el = document.createElement("div"); el.className = "note"; el.style.background = "#F9D9C8"; el.textContent = msg; $("#s-home").insertBefore(el, $("#s-home").children[1]); setTimeout(() => el.remove(), 8000); }
+
+// ---------- stash ----------
+async function loadStash() {
+  homeData = await api("/api/me");
+  const st = homeData.stash; me = homeData.me;
+  const roleName = me.role.charAt(0).toUpperCase() + me.role.slice(1);
+  $("#stash-role").textContent = `${roleName} · ${me.villas.length} villa${me.villas.length === 1 ? "" : "s"}`;
+  $("#stash-total").textContent = rp(st.total);
+  $("#stash-payday").textContent = `${st.payday.days} days · ${st.payday.label}`;
+  const need = Math.max(1, Math.ceil((st.next_milestone - st.total) / Math.max(1, st.share_estimate)));
+  $("#stash-mile").textContent = st.total ? `${need} more Grade A${need === 1 ? "" : "'s"} and you pass ${rp(st.next_milestone).replace(".000.000", " million").replace(".000", "k")}` : "Your first Grade A starts the stash";
+  $("#stash-milebar").style.width = Math.min(99, Math.round((st.total / st.next_milestone) * 100)) + "%";
+  $("#stash-rate").textContent = `Each Grade A review adds about ${rp(st.share_estimate)} to your stash, plus ${rp(st.name_bonus)} whenever a guest names you.`;
+  const cols = ["var(--yellow)", "var(--mint)", "var(--lav)", "var(--pink)", "var(--lilac)"];
+  $("#stash-villas").innerHTML = me.villas.map((v, i) => { const b = st.by_villa.find((x) => x.villa === v) || { amount: 0, wins: 0, named: 0 }; return `<div class="tile" style="background:${cols[i % cols.length]}"><b>${esc(villas.find((x) => x.key === v)?.name || v)}</b><span class="amt">${b.amount ? "Rp " + rb(b.amount) : "Rp 0"}</span><span>${b.wins ? `${b.wins} A${b.wins === 1 ? "" : "'s"}` : "No A's yet"}${b.named ? ` + named ${b.named === 1 ? "once" : b.named + " times"}` : ""}${b.wins === 1 ? " · first of many" : ""}</span></div>`; }).join("");
+  const wins = st.wins.slice(0, 8);
+  $("#stash-wins").innerHTML = wins.length ? wins.map((w) => `<div class="win${w.status === "pending" ? " pending" : ""}"><span class="g">${w.status === "pending" ? "A?" : "A"}</span><span class="t"><span>${dot(w.channel)}${esc(w.channel)} · ${esc(w.villa)} · ${esc(fmtDate(w.date))}</span><small class="${w.named ? "named" : ""}">${w.status === "pending" ? "Admin is checking it" : w.named ? "The guest named you!" : "Locked in"}</small></span><span class="amt">${w.status === "pending" ? "soon" : "+" + rb(w.amount)}</span></div>`).join("") : `<div class="note">No wins yet this season. The first one is the sweetest.</div>`;
+  $("#stash-more").textContent = st.wins.length > 8 ? `and ${st.wins.length - 8} more Grade A reviews` : "";
+  $("#stash-paydays").innerHTML = st.paydays.map((p) => `<div class="${p.next ? "next" : ""}"><b>${esc(p.label)}</b><span>${p.next ? "Next! " : ""}${esc(p.season)}</span></div>`).join("");
+}
+
+// ---------- admin ----------
+let adminData = null;
+async function loadAdmin() {
+  adminData = await api("/api/admin/queue?villa=" + encodeURIComponent($("#q-villa").value || ""));
+  $("#admin-name").textContent = adminData.me.name;
+  $("#admin-scope").textContent = adminData.me.scope ? `You see ${adminData.me.operator} villas only.` : "Owner Admin sees every villa.";
+  // Villa pickers only show the villas this admin looks after.
+  const vopts = adminData.villas.map((v) => `<option value="${esc(v.key)}">${esc(v.name)}</option>`).join("");
+  const keep = $("#q-villa").value; $("#q-villa").innerHTML = '<option value="">All villas</option>' + vopts; $("#q-villa").value = keep;
+  const rk = $("#rp-villa").value, gk = $("#g-villa").value; $("#rp-villa").innerHTML = vopts; $("#g-villa").innerHTML = vopts; if (rk) $("#rp-villa").value = rk; if (gk) $("#g-villa").value = gk;
+  $("#q-count").textContent = `To confirm · ${adminData.pending.length}`;
+  $("#reset-test").style.display = /owner/i.test(adminData.me.name) ? "" : "none";
+  $("#queue").innerHTML = adminData.pending.length ? adminData.pending.map(queueCard).join("") : `<div class="card thin"><span class="fred" style="font-size:18px">Nothing waiting.</span><br><span class="small">New uploads appear here for a quick look.</span></div>`;
+  $$("#queue [data-toggle]").forEach((b) => (b.onclick = () => { const full = $("#full-" + b.dataset.toggle), short = $("#short-" + b.dataset.toggle); const on = full.hidden; full.hidden = !on; short.hidden = on; b.textContent = on ? "Hide full review" : "Read full review with highlights"; }));
+  $$("#queue [data-confirm]").forEach((b) => (b.onclick = () => confirmUI(b.dataset.confirm, b.dataset.grade)));
+  $$("#queue [data-change]").forEach((b) => (b.onclick = () => { const box = $("#change-" + b.dataset.change); box.hidden = !box.hidden; }));
+  $$("#queue [data-set]").forEach((b) => (b.onclick = () => confirmUI(b.dataset.set, b.dataset.grade)));
+  const staffByVilla = (v) => adminData.staff.filter((s) => s.villas.includes(v));
+  const fillWho = () => { $("#rp-who").innerHTML = staffByVilla($("#rp-villa").value).map((s) => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join(""); };
+  $("#rp-villa").onchange = fillWho; fillWho();
+  renderGoalEditor();
+  const last = adminData.audit.find((a) => a.action === "reset_pin");
+  $("#rp-msg").textContent = last ? `Last reset: ${last.name} · by ${last.actor} · ${fmtDate(last.at)}` : "";
+  $("#audit").innerHTML = adminData.audit.slice(0, 30).map((a) => `<span>${esc(fmtDate(a.at))} · <b>${esc(a.actor)}</b> ${esc(a.action === "reset_pin" ? "reset PIN for " + a.name : a.action + " " + (a.grade || "") + (a.suggested && a.suggested !== a.grade ? " (was " + a.suggested + ")" : "") + " · " + (a.villa || ""))}</span>`).join("") || `<span class="small">Nothing yet.</span>`;
+  $("#export").href = "#"; $("#export").onclick = async (e) => { e.preventDefault(); const r = await fetch("/api/admin/export", { headers: { "x-session": session } }); const blob = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `payout-lines-${new Date().toISOString().slice(0, 10)}.csv`; document.body.append(a); a.click(); a.remove(); };
+}
+$("#q-villa").addEventListener("change", loadAdmin);
+function highlightHTML(r) {
+  let text = esc(r.review_text || "");
+  const cls = { praise: "hs", recommends: "hg", staff: "hl", complaint: "ha", check: "hf" };
+  (r.highlights || []).sort((a, b) => b.text.length - a.text.length).forEach((h) => { const q = esc(h.text); if (q && text.includes(q)) text = text.replace(q, `<mark class="${cls[h.type] || "hf"}">${q}</mark>`); });
+  return text;
+}
+function queueCard(r) {
+  const villaName = villas.find((v) => v.key === r.villa)?.name || r.villa;
+  const top = (r.checklist || [])[0];
+  const tags = [];
+  (r.staff_named || []).forEach((s) => tags.push(`Names: ${esc(s.name)}`));
+  const comps = (r.complaints || []).filter((c) => c.severity === "complaint"), cav = (r.complaints || []).filter((c) => c.severity !== "complaint");
+  if (comps.length) tags.push(`Complaint: ${esc(comps[0].issue || "")}`); if (cav.length) tags.push(`Has a "but": ${esc(cav[0].issue || "")}`);
+  if (!comps.length && !cav.length) tags.push("No complaints"); if (!(r.specifics || []).length) tags.push("General praise");
+  const flags = (r.flags || []).map((f) => `<span class="tag warn">Check: ${esc(f.replace(/_/g, " "))}</span>`).join("");
+  const roster = adminData.staff.filter((s) => s.villas.includes(r.villa));
+  const mentions = (r.staff_named || []).length && r.grade !== "C" ? `<div class="col" style="gap:2px"><span class="small"><b>Who did the guest name?</b> Tick to pay the ${rp(200000)} name bonus.</span>${roster.map((s) => { const guess = (r.staff_named || []).some((n) => n.name.toLowerCase().split(" ").some((w) => s.name.toLowerCase().includes(w))); return `<label class="mention"><input type="checkbox" data-mention="${esc(r.id)}" value="${esc(s.id)}" ${guess ? "checked" : ""}>${esc(s.name)} <span class="small">(${esc(s.role)})</span></label>`; }).join("")}</div>` : "";
+  const firstQuote = ((r.specifics || [])[0] || {}).quote || r.summary || "";
+  return `<article class="card thin col" style="gap:10px;border-radius:22px" id="card-${esc(r.id)}">
+    <div class="row"><span class="badge ${esc(r.grade)}">${esc(r.grade)}</span><span class="col" style="gap:0"><span style="font-size:16px;font-weight:800">Suggested ${esc(r.grade)} · ${esc(r.score)} / 100</span><span class="small">${dot(r.platform)}${esc(r.platform)} · ${esc(villaName)} · ${esc(r.rating != null ? r.rating + (r.rating_max === 10 || (r.rating > 5) ? " / 10" : " stars") : "no rating")} · ${esc(r.guest || "Guest")}</span><span class="small">Uploaded by ${esc(r.team || "")} · ${esc(fmtDate(r.graded_at))}</span></span></div>
+    <p id="short-${esc(r.id)}" style="margin:0;font-size:15px;line-height:1.45;font-style:italic;color:var(--mute2)">"… ${esc(firstQuote)} …"</p>
+    <div id="full-${esc(r.id)}" hidden class="col" style="gap:10px">
+      <div class="legend"><span><i class="sw" style="background:#DDF7EC"></i>Praise</span><span><i class="sw" style="background:#F7E3B0"></i>Recommends</span><span><i class="sw" style="background:#EDE6FF"></i>Staff named</span><span><i class="sw" style="background:#F9D9C8"></i>Complaint</span><span><i class="sw" style="border-style:dashed"></i>Check this</span></div>
+      <p style="margin:0;font-size:15px;line-height:1.6">${highlightHTML(r)}</p>
+      <div class="checks">${(r.checklist || []).map((c) => `<span>${c.ok ? "✓" : "✕"} ${esc(c.text)}</span>`).join("")}</div>
+    </div>
+    <button class="link" data-toggle="${esc(r.id)}" style="align-self:flex-start;font-size:14px;min-height:32px">Read full review with highlights</button>
+    <div class="row" style="flex-wrap:wrap;gap:6px">${tags.map((t) => `<span class="tag">${t}</span>`).join("")}${flags}</div>
+    ${mentions}
+    <div class="row" style="gap:8px"><button class="abtn dark" data-confirm="${esc(r.id)}" data-grade="${esc(r.grade)}">Confirm ${esc(r.grade)}</button><button class="abtn light" data-change="${esc(r.id)}">Change grade</button></div>
+    <div class="row" id="change-${esc(r.id)}" hidden style="gap:8px">${["A", "B", "C"].filter((g) => g !== r.grade).map((g) => `<button class="abtn light" data-set="${esc(r.id)}" data-grade="${g}">Make it ${g}</button>`).join("")}</div>
+    <div class="err" id="err-${esc(r.id)}"></div>
+  </article>`;
+}
+async function confirmUI(id, grade) {
+  const mentions = $$(`[data-mention="${CSS.escape(id)}"]:checked`).map((c) => c.value);
+  $$(`#card-${CSS.escape(id)} button`).forEach((b) => (b.disabled = true));
+  try { await api(`/api/admin/reviews/${encodeURIComponent(id)}/confirm`, { method: "POST", body: JSON.stringify({ grade, name_mentions: mentions }) }); await loadAdmin(); }
+  catch (e) { $("#err-" + CSS.escape(id)).textContent = e.message; $$(`#card-${CSS.escape(id)} button`).forEach((b) => (b.disabled = false)); }
+}
+$("#rp-go").addEventListener("click", async () => { const id = $("#rp-who").value; if (!id) return; $("#rp-go").disabled = true; try { const d = await api(`/api/admin/staff/${encodeURIComponent(id)}/reset-pin`, { method: "POST" }); $("#rp-msg").textContent = `Done: ${d.name}'s PIN is 8888 until they log in.`; } catch (e) { $("#rp-msg").textContent = e.message; } finally { $("#rp-go").disabled = false; } });
+function renderGoalEditor() {
+  const v = $("#g-villa").value; const g = (adminData.goals || {})[v] || {};
+  $("#g-rows").innerHTML = Object.keys(GOALS).map((ch) => `<div class="row" style="gap:6px;font-size:13px;font-weight:800"><span style="flex:1">${dot(ch)}${esc(ch)}</span><input class="input" style="height:40px;width:74px;font-size:14px" type="number" min="0" placeholder="count" value="${g[ch]?.count ?? ""}" data-gcount="${esc(ch)}"><input class="input" style="height:40px;width:74px;font-size:14px" type="number" step="0.01" min="0" placeholder="score" value="${g[ch]?.score ?? ""}" data-gscore="${esc(ch)}"><button class="abtn light" style="flex:0 0 auto;min-height:40px;font-size:13px" data-gsave="${esc(ch)}">Save</button></div>`).join("");
+  $$("#g-rows [data-gsave]").forEach((b) => (b.onclick = async () => { const ch = b.dataset.gsave; b.disabled = true; try { const d = await api("/api/admin/goals", { method: "POST", body: JSON.stringify({ villa: v, channel: ch, count: $(`[data-gcount="${CSS.escape(ch)}"]`).value, score: $(`[data-gscore="${CSS.escape(ch)}"]`).value }) }); adminData.goals = d.goals; b.textContent = "Saved"; setTimeout(() => (b.textContent = "Save"), 1500); } finally { b.disabled = false; } }));
+}
+$("#g-villa").addEventListener("change", renderGoalEditor);
+let resetArmed = false;
+$("#reset-test").addEventListener("click", async () => { const b = $("#reset-test"); if (!resetArmed) { resetArmed = true; b.textContent = "Tap again to wipe reviews, payouts and audit"; setTimeout(() => { resetArmed = false; b.textContent = "Reset test data"; }, 6000); return; } resetArmed = false; b.disabled = true; try { const d = await api("/api/admin/reset-test-data", { method: "POST" }); $("#reset-msg").textContent = `Done. Cleared the site and removed ${d.archived} Notion rows. PINs are kept.`; await loadAdmin(); } catch (e) { $("#reset-msg").textContent = e.message; } finally { b.disabled = false; b.textContent = "Reset test data"; } });
+
+// ---------- start ----------
+(async () => {
+  try { await loadVillas(); } catch {}
+  if (session && kind === "staff") { try { await go("home"); await resumeJob(); return; } catch (e) { if (e.message === "pin") return; logout(); } }
+  if (session && kind === "admin") { try { await go("admin"); return; } catch { logout(); } }
+  show("welcome");
+})();
+document.addEventListener("visibilitychange", () => { if (!document.hidden && kind === "staff" && store("rg-job")) resumeJob(); });
+</script>
+</body>
+</html>
