@@ -612,5 +612,77 @@ function escapeHtml(s) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// =====================================================================
+// FUTURE FAMILY HOLIDAYS — the Endless Summer family game, served at /play
+// Plays are saved on the same /data disk as the review configs.
+// Team download: /api/ffh/export.csv?token=ADMIN_TOKEN
+// Optional env: PUBLIC_URL (e.g. https://endlesssummerbali.com) for link
+// previews, META_PIXEL_ID to switch on the Meta pixel.
+// =====================================================================
+app.set("trust proxy", true);
+const FFH_DIR   = path.join(__dirname, "ffh");
+const FFH_FILE  = path.join(DATA_DIR, "ffh-plays.json");
+const PIXEL_ID  = (process.env.META_PIXEL_ID || "").replace(/[^0-9]/g, "");
+let ffhPage = null;
+function ffhHtml(req) {
+  if (!ffhPage) ffhPage = fs.readFileSync(path.join(FFH_DIR, "index.html"), "utf8");
+  const base = (process.env.PUBLIC_URL || (req.protocol + "://" + req.get("host"))).replace(/\/$/, "");
+  const pixel = PIXEL_ID ? `<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${PIXEL_ID}');fbq('track','PageView');</script>` : "";
+  return ffhPage.split("{{BASE}}").join(base).replace("<!--PIXEL-->", pixel);
+}
+app.get(["/play", "/play/", "/play/index.html"], (req, res) => {
+  try { res.set("Cache-Control", "no-cache").type("html").send(ffhHtml(req)); }
+  catch (e) { console.error(e); res.status(500).send("Game not found"); }
+});
+app.use("/play", express.static(FFH_DIR, { maxAge: "7d", index: false }));
+
+function loadPlays() { try { return JSON.parse(fs.readFileSync(FFH_FILE, "utf8")); } catch (e) { return {}; } }
+function savePlays(obj) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    const tmp = FFH_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(obj));
+    fs.renameSync(tmp, FFH_FILE);
+    return true;
+  } catch (e) { console.error("ffh save failed:", e.message); return false; }
+}
+
+// === GAME: save (or update) one play — called as the family goes through the cards ===
+app.post("/api/ffh/play", (req, res) => {
+  try {
+    const { device, run } = req.body || {};
+    const playId = run && String(run.playId || "").slice(0, 80);
+    if (!playId) return res.status(400).json({ error: "no playId" });
+    const plays = loadPlays();
+    const now = new Date().toISOString();
+    const prev = plays[playId];
+    plays[playId] = { device: String(device || "").slice(0, 80), firstAt: prev ? prev.firstAt : now, updatedAt: now, run };
+    savePlays(plays);
+    res.json({ ok: true });
+  } catch (e) { console.error(e); res.status(500).json({ error: e.message }); }
+});
+
+// === TEAM: every play as a spreadsheet ===
+app.get("/api/ffh/export.csv", requireAdmin, (req, res) => {
+  const plays = loadPlays();
+  const j = v => (v === undefined || v === null) ? "" : (typeof v === "string" ? v : JSON.stringify(v));
+  const rows = Object.entries(plays).map(([id, p]) => {
+    const r = p.run || {}, lead = r.lead || {};
+    return {
+      started: r.startedAt || p.firstAt, last_update: p.updatedAt, finished: r.finishedAt || "", completed: r.completed ? "yes" : "no",
+      play_id: id, device: p.device, mode: r.mode, kids_ages: j(r.ages), city: r.city,
+      persona: r.personaName || r.persona, second_persona: r.secondary, agreement: j(r.agreement),
+      instagram_or_email: lead.contact || "", is_email: lead.isEmail ? "yes" : "", prize_entry: lead.consent ? "yes" : "",
+      picks: j(r.picks), votes: j(r.players), beliefs: j(r.beliefs), sorted_items: j(r.ease), comments: j(r.notes),
+      card_saved: r.imageSaved ? "yes" : "", caption_copied: r.shareCopied ? "yes" : "", music: r.music ? "on" : "off", read_aloud: r.readAloud ? "on" : "off",
+    };
+  }).sort((a, b) => String(b.started).localeCompare(String(a.started)));
+  const headers = ["started","last_update","finished","completed","play_id","device","mode","kids_ages","city","persona","second_persona","agreement","instagram_or_email","is_email","prize_entry","picks","votes","beliefs","sorted_items","comments","card_saved","caption_copied","music","read_aloud"];
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", 'attachment; filename="future_family_holidays_plays.csv"');
+  res.send(toCsv(headers, rows));
+});
+app.get("/api/ffh/export.json", requireAdmin, (req, res) => res.json(loadPlays()));
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("Review Studio running on port " + PORT));
