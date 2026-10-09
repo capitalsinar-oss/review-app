@@ -653,7 +653,7 @@ function setMusic(on){
   [["musicBtn",on?"🎵":"🔇"],["musicBtn2",on?"🎵 Music on":"🔇 Music off"],["musicBtn3",on?"🎵 Music on":"🔇 Music off"]].forEach(([id,t])=>{ const b=$i(id); if(b){ b.setAttribute("aria-pressed", on); b.textContent=t; } });
   if(on) startMusicEl(); else { stopClip(); stopMusic(); }
 }
-["musicBtn","musicBtn2","musicBtn3"].forEach(id=>$i(id).addEventListener("click",()=>setMusic(!MUSIC.on)));
+["musicBtn","musicBtn2","musicBtn3"].forEach(id=>$i(id).addEventListener("click",()=>{ setMusic(!MUSIC.on); if(typeof track==="function") track("music",{on:MUSIC.on}); }));
 document.addEventListener("touchend", unlockAll, {capture:true, passive:true});
 document.addEventListener("click", e=>{
   unlockAll();
@@ -705,7 +705,7 @@ function say(text){
 function hush(){ try{ speechSynthesis.cancel(); }catch(e){} if(speaking){ speaking=false; if(MUSIC.on) startMusicEl(); } }
 function setRead(on){ readOn = on && canSpeak; $i("readBtn").setAttribute("aria-pressed", readOn); if(!readOn) hush(); }
 if(!canSpeak) $i("readBtn").hidden = true;
-$i("readBtn").addEventListener("click",()=>{ if(!readOn){ setRead(true); speakCard(); } else setRead(false); });
+$i("readBtn").addEventListener("click",()=>{ if(!readOn){ setRead(true); speakCard(); } else setRead(false); if(typeof track==="function") track("read_aloud",{on:readOn}); });
 
 /* ---------- utils ---------- */
 const byId = id => IDEAS.concat(EASE).find(c=>c.id===id) || BELIEFS.find(c=>c.id===id);
@@ -714,7 +714,7 @@ const rid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 function lsGet(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
-function show(id){document.querySelectorAll(".screen").forEach(s=>s.hidden = s.id!==id); window.scrollTo(0,0); const el=$i(id); if(el) el.scrollTop=0;}
+function show(id){document.querySelectorAll(".screen").forEach(s=>s.hidden = s.id!==id); window.scrollTo(0,0); const el=$i(id); if(el) el.scrollTop=0; if(typeof track==="function") track("screen",{id});}
 function buzz(ms){try{navigator.vibrate&&navigator.vibrate(ms);}catch(e){}}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));}
 const rand = a => a[Math.floor(Math.random()*a.length)];
@@ -747,7 +747,7 @@ async function initCaps(){
 function runRecord(){
   return { playId:S.playId, variant:S.variant, mode:S.mode, ages:S.ages, city:S.city, startedAt:S.startedAt, finishedAt:S.finishedAt, completed:S.completed,
     ideaIds:S.ideaIds, players:S.players, beliefs:S.beliefs, ease:S.ease, picks:S.picks||{}, notes:S.notes, undos:S.undos, persona:S.persona, personaName:(PERSONAS[S.persona]||{}).name||"", secondary:S.secondary,
-    agreement:S.agreement, shareCopied:S.shareCopied, imageSaved:S.imageSaved, lead:S.lead, music:MUSIC.on, readAloud:readOn };
+    agreement:S.agreement, utm:UTM, villaClicked:S.villaClicked, shareCopied:S.shareCopied, imageSaved:S.imageSaved, lead:S.lead, music:MUSIC.on, readAloud:readOn };
 }
 function deviceId(){ let d=null; try{ d=localStorage.getItem("esv_ffh_device"); if(!d){ d=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(36).slice(2)); localStorage.setItem("esv_ffh_device",d); } }catch(e){} return d||"anon"; }
 let hostSaveTmr=null;
@@ -773,6 +773,60 @@ function save(){
     try{ await ref.set({runs:myRuns, updatedAt:new Date().toISOString()}); }catch(e){}
   });
 }
+
+
+/* ---------- tracking (only on our own site, never on claude.ai) ----------
+   Our own anonymous stats: every screen, card, answer time, and where people leave.
+   Meta pixel: only the grown-up milestones, never kids' answers. */
+const TRACK_ON = !window.claude;
+const UTM = (()=>{ const keys=["utm_source","utm_medium","utm_campaign","utm_content","utm_term","fbclid","ref"];
+  let u={}; try{ u=JSON.parse(sessionStorage.getItem("esv_ffh_utm")||"null")||{}; }catch(e){}
+  try{ const q=new URLSearchParams(location.search); let any=false; const n={}; keys.forEach(k=>{ const v=q.get(k); if(v){ n[k]=v.slice(0,120); any=true; } }); if(any){ u=n; sessionStorage.setItem("esv_ffh_utm",JSON.stringify(u)); } }catch(e){}
+  try{ if(Object.keys(u).length && !localStorage.getItem("esv_ffh_first_touch")) localStorage.setItem("esv_ffh_first_touch",JSON.stringify(Object.assign({at:new Date().toISOString()},u))); }catch(e){}
+  return u; })();
+const SESSION = (()=>{ try{ let v=sessionStorage.getItem("esv_ffh_session"); if(!v){ v=Math.random().toString(36).slice(2)+Date.now().toString(36); sessionStorage.setItem("esv_ffh_session",v); } return v; }catch(e){ return "s"+Date.now(); } })();
+const T0 = Date.now();
+let evQ=[], evTmr=null;
+function cookie(n){ const m=document.cookie.match(new RegExp("(?:^|; )"+n+"=([^;]*)")); return m?decodeURIComponent(m[1]):""; }
+function flushEvents(useBeacon){
+  if(!TRACK_ON || !evQ.length) return;
+  const body=JSON.stringify({device:deviceId(), session:SESSION, utm:UTM, fbp:cookie("_fbp"), fbc:cookie("_fbc") || (UTM.fbclid ? "fb.1."+T0+"."+UTM.fbclid : ""), page:location.href.split("#")[0], events:evQ.splice(0,50)});
+  try{
+    if(useBeacon && navigator.sendBeacon){ navigator.sendBeacon("/api/ffh/events", new Blob([body],{type:"application/json"})); }
+    else fetch("/api/ffh/events",{method:"POST",headers:{"Content-Type":"application/json"},body,keepalive:true}).catch(()=>{});
+  }catch(e){}
+  if(evQ.length) flushEvents(useBeacon);
+}
+const META = {  // our event -> Meta pixel event (grown-up milestones only)
+  landing:["track","ViewContent",{content_name:"Future Family Holidays"}],
+  game_start:["trackCustom","GameStart"],
+  part_reached:["trackCustom","GameProgress"],
+  game_complete:["track","CompleteRegistration",{content_name:"Future Family Holidays"}],
+  lead:["track","Lead",{content_name:"3 nights prize entry"}],
+  card_shared:["trackCustom","CardShared"],
+  villa_click:["trackCustom","VillaClick"],
+};
+function track(name, props){
+  if(!TRACK_ON) return;
+  const st = (typeof S!=="undefined" && S) ? S : {};
+  const ev = {name, t:Date.now()-T0, at:new Date().toISOString(), playId:st.playId||null, phase:st.phase||null, idx:(typeof st.idx==="number"?st.idx:null), props:props||{}};
+  ev.eventId = (st.playId||SESSION)+"-"+name+(props&&props.part?"-"+props.part:"");
+  evQ.push(ev);
+  const m = META[name];
+  if(m && window.fbq && st.phase!=="kid"){ try{ const extra=Object.assign({}, m[2]||{}, name==="part_reached"?{part:props.part}:{}, name==="game_complete"?{persona:props.persona}:{}); fbq(m[0], m[1], extra, {eventID:ev.eventId}); }catch(e){} }
+  clearTimeout(evTmr);
+  if(m) flushEvents(false); else evTmr=setTimeout(()=>flushEvents(false), 4000);
+}
+document.addEventListener("visibilitychange",()=>{
+  if(!TRACK_ON) return;
+  if(document.visibilityState==="hidden"){
+    const scr=[...document.querySelectorAll(".screen")].find(x=>!x.hidden);
+    const st=(typeof S!=="undefined"&&S)?S:{}; const it=st.deck&&st.deck[st.idx];
+    track("leave",{screen:scr?scr.id:"", card:it?it.id:null, title:it?((itemData(it)||{}).t||""):"", cardKind:it?it.kind:null, secs:Math.round((Date.now()-T0)/1000)});
+    flushEvents(true);
+  } else track("return",{});
+});
+addEventListener("pagehide",()=>flushEvents(true));
 
 /* ---------- mascot: Sunny, the sun from the logo ---------- */
 function drawBuddy(){
@@ -824,14 +878,15 @@ $i("startBtn").addEventListener("click",()=>{
   unlockAll();
   const pref = lsGet("esv_ffh_music", null);
   setMusic(pref===null ? true : pref);
-  lsDel("esv_ffh_resume"); newState(); renderChips(); show("s-who");
+  lsDel("esv_ffh_resume"); newState(); renderChips(); track("game_start",{}); show("s-who");
 });
-$i("s-who").addEventListener("click",e=>{const b=e.target.closest("[data-mode]");if(!b)return;S.mode=b.dataset.mode;renderChips();show("s-ages");});
+$i("s-who").addEventListener("click",e=>{const b=e.target.closest("[data-mode]");if(!b)return;S.mode=b.dataset.mode;renderChips();track("mode_chosen",{mode:S.mode});show("s-ages");});
 $i("agesNext").addEventListener("click",()=>{
   const worlds = ["b","m","r","n","l","i","f","c"];
   const kidPlays = S.mode==="kid" || S.mode==="turns";
   S.ideaIds = worlds.flatMap(w=>shuffle(IDEAS.filter(c=>c.w===w && !(kidPlays && c.parentOnly))).slice(0,2).map(c=>c.id));
   S.players = {}; S.beliefs = {}; S.ease = {}; S.picks = {}; S.notes = {}; S.unlocked = {}; S.seenSection = {};
+  track("ages_done",{ages:S.ages, city:S.city});
   save();
   startPhase(S.mode==="kid" ? "kid" : S.mode==="together" ? "together" : "parent");
 });
@@ -854,6 +909,7 @@ function renderProgressMarks(){
 }
 function startPhase(who){
   S.phase = who; S.deck = buildDeck(who); S.idx = 0; S.history = []; S.combo=0;
+  track("round_start",{round:who});
   S.players[who] = S.players[who] || {votes:{}, ms:{}};
   setRead(who==="kid");
   $i("cmt").placeholder = who==="kid" ? "Want to say something? Type it here" : "Comment on this one (optional)";
@@ -883,7 +939,7 @@ function showSection(k){
     ${S.phase==="kid"&&canSpeak?`<button class="linkbtn" id="sectionSay" type="button">🔊 Hear it again</button>`:""}`;
   show("s-section");
   if(sec.say && readOn) say(sec.say);
-  $i("sectionGo").addEventListener("click",()=>{ S.seenSection[S.phase+":"+k]=true; checkpointSave(); hush(); show("s-deck"); renderProgressMarks(); renderStack(); });
+  $i("sectionGo").addEventListener("click",()=>{ S.seenSection[S.phase+":"+k]=true; track("part_reached",{part:k, round:S.phase}); checkpointSave(); hush(); show("s-deck"); renderProgressMarks(); renderStack(); });
   const again=$i("sectionSay"); if(again) again.addEventListener("click",()=>{ setRead(true); say(sec.say); });
 }
 function next(){
@@ -933,6 +989,7 @@ function renderStack(){
   card.className = "card enter"+(it.kind==="belief"?" belief":"")+(it.kind==="pick"?" pick":"")+(isKid?" kid":"");
   card.innerHTML = cardHTML(it,isKid);
   stage.appendChild(card);
+  track("card_view",{card:it.id, title:(itemData(it)||{}).t||"", kind:it.kind, n:S.idx+1, of:S.deck.length});
   fitPhotos(stage); requestAnimationFrame(()=>fitPhotos(stage));
   card.querySelectorAll("video.vid").forEach(v=>{
     v.muted=true;
@@ -1003,6 +1060,7 @@ function vote(p){
   else if(it.kind==="idea"){ S.players[who].votes[it.id]=v; S.players[who].ms[it.id]=Math.round(performance.now()-S.shownAt); }
   else if(it.kind==="belief") S.beliefs[it.id]=v; else S.ease[it.id]=v;
   S.history.push({it, v});
+  track("card_answer",{card:it.id, title:(itemData(it)||{}).t||"", kind:it.kind, answer:Array.isArray(v)?v.length+" picked":v, ms:Math.round(performance.now()-S.shownAt), comment:!!S.notes[noteKey(it)]});
   const kind = it.kind==="pick" ? "love" : {pos:"love",top:"book",neg:"nope",mid:"maybe"}[p];
   if(kind==="love"||kind==="book") S.combo++; else S.combo=0;
   const cb=$i("combo"); if(S.combo>=3){ cb.textContent="x"+S.combo+" combo"; cb.classList.add("on"); } else cb.classList.remove("on");
@@ -1014,6 +1072,7 @@ function vote(p){
     S.unlocked[S.phase+":"+hit]=true; checkpointSave();
     mood("book", hit===2 ? "Done!!" : hit===0 ? "Level up!" : "Halfway hero!");
     renderProgressMarks();
+    track("snack_unlocked",{level:hit+1});
     levelUp(SNACKS[(hit+snackOffset())%SNACKS.length], hit, next);
     return;
   }
@@ -1142,6 +1201,7 @@ const TERMS = `<div class="terms" id="terms" hidden>
   <p>Win 3 nights at Endless Summer Villa, Uluwatu. Play the game, post your family card on Instagram (story or feed) and tag @endless.summer.bali and the family you'd bring. Your account must be public so we can see it.</p>
   <p>One winning family, chosen by my kids. Closes 15 Dec 2026. Announced on @endless.summer.bali and by DM within 2 weeks of closing.</p>
   <p>Up to 8 guests, on dates we agree together within 12 months, outside June–September and Christmas/New Year. Villa only: flights, transfers, meals and activities aren't included. Not exchangeable for cash.</p>
+  <p>Privacy: we count anonymous visits and use the Meta pixel to see which of our ads bring families here. Your answers and your kids' answers are never sent to Meta. <button class="linkbtn" id="noAdsBtn" type="button" style="padding:0">Turn off ad tracking</button></p>
 </div>`;
 function showResult(){
   hush(); setRead(false);
@@ -1151,6 +1211,7 @@ function showResult(){
   const cmp = compareTurns(); S.agreement = cmp ? cmp.pct : null;
   S.completed = true; S.finishedAt = new Date().toISOString();
   save(); lsDel("esv_ffh_resume");
+  track("game_complete",{persona:(PERSONAS[S.persona]||{}).name, mode:S.mode, secs:S.startedAt?Math.round((Date.now()-new Date(S.startedAt))/1000):null});
   const P = PERSONAS[S.persona];
   const places = BALI[S.persona] || [];
   let vsHTML = "";
@@ -1181,6 +1242,7 @@ function showResult(){
       <div class="clickers" id="resultClickers">${SNACKS.map(clickerHTML).join("")}</div>
       <p class="fine">No sound? Check your phone isn't on silent.</p>
     </div>
+    <a class="btn ghost" id="villaBtn" href="https://www.endlesssummerbali.com/?utm_source=ffh_game&utm_medium=game&utm_campaign=future_family_holidays" target="_blank" rel="noopener">See the villa we're building this for</a>
     <button class="btn ghost" id="againBtn" type="button">Play again with someone else</button>`;
   show("s-result"); burst(60);
   let canvas=null, tmr=null;
@@ -1190,10 +1252,12 @@ function showResult(){
   const check = ()=>{ $i("saveShare").disabled = !(valid($i("contact").value.trim()) && $i("consent").checked); };
   $i("contact").addEventListener("input",()=>{ check(); clearTimeout(tmr); tmr=setTimeout(render,450); });
   $i("consent").addEventListener("change",check);
+  const na=$i("noAdsBtn"); if(na) na.addEventListener("click",()=>{ try{ localStorage.setItem("esv_ffh_noads","1"); }catch(e){} try{ if(window.fbq) fbq("consent","revoke"); }catch(e){} na.textContent="Ad tracking is off"; na.disabled=true; });
   $i("termsBtn").addEventListener("click",e=>{ e.preventDefault(); const t=$i("terms"); t.hidden=!t.hidden; });
   $i("saveShare").addEventListener("click",async()=>{
     const contact=$i("contact").value.trim(), msg=$i("saveMsg");
     S.lead={contact, isEmail:contact.includes("@",1)&&/\./.test(contact), consent:true, at:new Date().toISOString()};
+    track("lead",{isEmail:S.lead.isEmail});
     await render();
     const caption=`We're ${P.name} 🌞 Just voted on what @endless.summer.bali builds next for families in Uluwatu. @_______ come with us?`;
     try{ await navigator.clipboard.writeText(caption); S.shareCopied=true; }catch(e){}
@@ -1217,12 +1281,14 @@ function showResult(){
       else { try{ const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); saved=true; }catch(e){} }
     }
     S.imageSaved=saved; save();
+    track(saved?"card_shared":"card_share_failed",{copied:!!S.shareCopied});
     msg.textContent = saved ? (S.shareCopied ? "Saved, and the caption is copied. Post it and tag the family you'd bring." : "Saved. Post it and tag @endless.summer.bali and the family you'd bring.")
                             : "You're entered. Press and hold the card to save it, then post and tag us.";
     burst(30);
   });
   wireClickers($i("resultClickers"), (sn,n)=>{ if(n%25===0) burst(20); });
-  $i("againBtn").addEventListener("click",()=>{ newState(); renderChips(); show("s-who"); });
+  $i("againBtn").addEventListener("click",()=>{ track("play_again",{}); newState(); renderChips(); show("s-who"); });
+  $i("villaBtn").addEventListener("click",()=>{ S.villaClicked=true; save(); track("villa_click",{}); flushEvents(true); });
 }
 
 /* ---------- confetti ---------- */
@@ -1251,13 +1317,14 @@ if(saved && !saved.completed && saved.deck && saved.deck.length){
   $i("resumeBox").hidden=false;
   const done = Object.values(saved.players||{}).reduce((s,p)=>s+Object.keys(p.votes||{}).length,0) + Object.keys(saved.beliefs||{}).length + Object.keys(saved.ease||{}).length;
   $i("resumeTxt").textContent = `You've done ${done} card${done===1?"":"s"} already.`;
-  $i("resumeBtn").addEventListener("click",()=>{
+  $i("resumeBtn").addEventListener("click",()=>{ track("resume",{});
     unlockAll(); S = saved;
     const pref = lsGet("esv_ffh_music", null); setMusic(pref===null ? true : pref);
     setRead(S.phase==="kid"); next();
   });
   $i("restartBtn").addEventListener("click",()=>{ lsDel("esv_ffh_resume"); $i("resumeBox").hidden=true; });
 }
+track("landing",{resumable:!$i("resumeBox").hidden, source:UTM.utm_source||UTM.ref||"", campaign:UTM.utm_campaign||""});
 })();
 </script>
 
